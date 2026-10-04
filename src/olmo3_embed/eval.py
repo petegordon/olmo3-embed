@@ -53,6 +53,7 @@ def main():
         model = OlmoEmbedder(
             args.model, pooling=args.olmo_pooling, instructions=not args.no_instructions,
             dtype=args.dtype or "bfloat16", max_length=args.max_seq_length or 512, load_in_4bit=args.load_in_4bit,
+            batch_size=args.batch_size,
         )
     else:
         kwargs = {"model_kwargs": {"torch_dtype": args.dtype}} if args.dtype else {}

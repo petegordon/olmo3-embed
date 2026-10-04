@@ -1,0 +1,1 @@
+{"task": "NanoArguAnaRetrieval", "splits": ["train"], "version": {"mteb": "2.22.3", "torch": "2.11.0+cu128", "sentence-transformers": "6.1.0", "flash-attn": null, "transformers": "5.18.0"}, "encode_kwargs": {"batch_size": 32}, "subsets": ["default"]}

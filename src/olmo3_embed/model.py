@@ -34,10 +34,12 @@ class OlmoEmbedder(AbsEncoder):
         revision: str | None = None,
         device: str | None = None,
         load_in_4bit: bool = False,
+        batch_size: int = 32,
     ):
         if pooling not in ("mean", "last"):
             raise ValueError(pooling)
         self.pooling, self.instructions, self.max_length = pooling, instructions, max_length
+        self.batch_size = batch_size  # adaptive: halved on CUDA OOM
         self.device = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
         self.tokenizer = AutoTokenizer.from_pretrained(model_name, revision=revision)
         self.tokenizer.padding_side = "right"
@@ -104,11 +106,21 @@ class OlmoEmbedder(AbsEncoder):
         texts = [str(t) for batch in inputs for t in batch["text"]]
         if instruction:
             texts = [INSTRUCTION_TEMPLATE.format(instruction=instruction, text=t) for t in texts]
-        # Encode longest-first in length-sorted batches: minimal padding, and any OOM surfaces on the first batch.
-        bs = inputs.batch_size or 32
+        # Encode longest-first in length-sorted batches: minimal padding, and any OOM surfaces on the first batch,
+        # where we halve the batch size and retry (it stays halved for the rest of the run).
         order = sorted(range(len(texts)), key=lambda i: -len(texts[i]))
         out = np.empty((len(texts), self.model.config.hidden_size), dtype=np.float32)
-        for s in range(0, len(order), bs):
-            idx = order[s : s + bs]
-            out[idx] = self.embed([texts[i] for i in idx]).cpu().numpy()
+        s = 0
+        while s < len(order):
+            idx = order[s : s + self.batch_size]
+            try:
+                out[idx] = self.embed([texts[i] for i in idx]).cpu().numpy()
+            except torch.OutOfMemoryError:
+                if self.batch_size == 1:
+                    raise
+                torch.cuda.empty_cache()
+                self.batch_size //= 2
+                print(f"[OlmoEmbedder] CUDA OOM -> batch_size {self.batch_size}", flush=True)
+                continue
+            s += len(idx)
         return out
