@@ -101,10 +101,14 @@ class OlmoEmbedder(AbsEncoder):
         instruction = None
         if self.instructions and prompt_type == PromptType.query:
             instruction = self.get_instruction(task_metadata, prompt_type) or None
-        out = []
-        for batch in inputs:
-            texts = [str(t) for t in batch["text"]]
-            if instruction:
-                texts = [INSTRUCTION_TEMPLATE.format(instruction=instruction, text=t) for t in texts]
-            out.append(self.embed(texts).cpu().numpy())
-        return np.concatenate(out)
+        texts = [str(t) for batch in inputs for t in batch["text"]]
+        if instruction:
+            texts = [INSTRUCTION_TEMPLATE.format(instruction=instruction, text=t) for t in texts]
+        # Encode longest-first in length-sorted batches: minimal padding, and any OOM surfaces on the first batch.
+        bs = inputs.batch_size or 32
+        order = sorted(range(len(texts)), key=lambda i: -len(texts[i]))
+        out = np.empty((len(texts), self.model.config.hidden_size), dtype=np.float32)
+        for s in range(0, len(order), bs):
+            idx = order[s : s + bs]
+            out[idx] = self.embed([texts[i] for i in idx]).cpu().numpy()
+        return out
