@@ -46,7 +46,7 @@ It's out of scope for us. Treat the published Qwen3 numbers as **±~1.5 per task
   one python.exe reached 14 GB RAM and Windows commit hit 44.6/45.9 GB. Mitigations:
   1. Pass `--max-seq-length` (8192 is plenty for BEIR) and a smaller batch for long-doc tasks.
   2. Run `scripts/ram_guard.sh 8 &` during evals; it kills any python.exe above 8 GB working set.
-  3. Optional: NVIDIA Control Panel → Manage 3D settings → *CUDA – Sysmem Fallback Policy* → **Prefer No Sysmem
+  3. **Done on Pete's laptop 2026-10-04 (verified: OOM at 11 GB, no spill).** NVIDIA Control Panel → Manage 3D settings → *CUDA – Sysmem Fallback Policy* → **Prefer No Sysmem
      Fallback**. CUDA then raises a real OOM instead of eating RAM. **Recommended before any OLMo work.**
 - **mteb writes non-default-kwarg runs under `.../experiments/exp_<hash>/`.** `compare_published.py` keys on the
   directory name, so pass `--ours` per run folder.
