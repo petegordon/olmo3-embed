@@ -35,6 +35,10 @@ def main():
     ap.add_argument("--max-seq-length", type=int,
                     help="cap tokens per text. On Windows, VRAM overflow silently spills into system RAM "
                          "(driver sysmem fallback) instead of raising OOM, so cap long-doc tasks like Touche2020")
+    ap.add_argument("--olmo-pooling", choices=["mean", "last"],
+                    help="use our OlmoEmbedder (model.py) instead of mteb's registered loader")
+    ap.add_argument("--no-instructions", action="store_true", help="OlmoEmbedder: no query instructions")
+    ap.add_argument("--load-in-4bit", action="store_true", help="OlmoEmbedder: bitsandbytes nf4 (local 7B smoke tests)")
     args = ap.parse_args()
 
     if args.tasks:
@@ -43,10 +47,18 @@ def main():
         tasks = mteb.get_benchmark("BEIR").tasks
     else:
         tasks = mteb.get_tasks(tasks=SUITES[args.suite], languages=["eng"])
-    kwargs = {"model_kwargs": {"torch_dtype": args.dtype}} if args.dtype else {}
-    if args.max_seq_length:
-        kwargs["max_seq_length"] = args.max_seq_length
-    model = mteb.get_model(args.model, **kwargs)  # uses the registered ModelMeta (prompts, pooling) when available
+    if args.olmo_pooling:
+        from olmo3_embed.model import OlmoEmbedder
+
+        model = OlmoEmbedder(
+            args.model, pooling=args.olmo_pooling, instructions=not args.no_instructions,
+            dtype=args.dtype or "bfloat16", max_length=args.max_seq_length or 512, load_in_4bit=args.load_in_4bit,
+        )
+    else:
+        kwargs = {"model_kwargs": {"torch_dtype": args.dtype}} if args.dtype else {}
+        if args.max_seq_length:
+            kwargs["max_seq_length"] = args.max_seq_length
+        model = mteb.get_model(args.model, **kwargs)  # registered ModelMeta (prompts, pooling) when available
     mteb.evaluate(
         model,
         tasks,
