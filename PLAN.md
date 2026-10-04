@@ -92,25 +92,33 @@ once.
 3. **Hard-negative mining (local GPU).** Teacher retrieves the top 100. Keep negatives from ranks 30–100. Apply
    **positive-aware false-negative filtering**: drop a negative if its score is above 0.95 × the positive's score
    (NV-Retriever).
-4. **Synthetic data via the Claude API, Message Batches (50% off).** *Decided 2026-10-04: commercial API for the
-   first run.* To keep output tokens (the expensive part) small, use **passage → query** generation rather than
+4. **Synthetic data from subscription CLIs, with several generators.** *Decided 2026-10-04: use Pete's existing
+   subscriptions for personal open research.* To keep output short, use **passage → query** generation rather than
    writing passages from scratch:
    - Sample real passages from open corpora that aren't BEIR test corpora (Wikipedia, S2ORC abstracts,
      StackExchange, and so on).
-   - Pack ~20 passages per request. The model writes a BEIR-shaped query for each (argument, claim, financial
-     question, duplicate question, entity search, and so on), plus a task instruction.
+   - Pack ~20 passages per call. The model writes a BEIR-shaped query for each (argument, claim, financial question,
+     duplicate question, entity search, and so on), plus a task instruction, returned as JSON.
    - Hard negatives come from local mining (step 3), not from the LLM.
 
-   Cost estimate (≈200 input + ≈40 output tokens per example, batch pricing):
+   **Generator backends** live in `src/olmo3_embed/data/synth/`, with one adapter per CLI and a shared prompt and
+   JSON schema:
 
-   | Examples | Haiku 4.5 ($0.50/$2.50 per MTok) | Sonnet 5.5 ($1/$5 per MTok) |
-   |---:|---:|---:|
-   | 50k (pilot) | ≈ $10 | ≈ $20 |
-   | 200k | ≈ $40 | ≈ $80 |
+   | Backend | Plan | Headless call | Limit to plan around |
+   |---|---|---|---|
+   | **Claude Opus 5.5** (primary) | Claude Max | `claude -p --output-format json` | Max session and weekly usage windows |
+   | **OpenAI Codex** | ChatGPT Plus ($20) | `codex exec` | 5-hour usage window on Plus (reinstated 2026-08-25) |
+   | **Gemini via Antigravity** | Google AI Pro | `agy -p` / `agy --print` | Gemini CLI no longer serves AI Pro (since 2026-06-18). `agy -p` has a known hang on Windows non-TTY, so run it from WSL/Linux |
+   | *(fallback)* any Batch API | pay per token | SDK | ≈ $10–20 per 50k examples (Haiku 4.5 / Sonnet 5.5 batch) |
+   | *(fully-open v2)* OLMo-3-7B/32B-Instruct | free (local / Colab) | vLLM | Slow; keeps the "all-open" claim pure |
 
-   Plan: a 50k pilot on Sonnet 5.5, plus a 2k side-by-side against Haiku to see whether quality differs. Re-run
-   with OLMo-3-32B later if we want a fully-open v2. The Max plan covers interactive development (this repo,
-   prompt iteration). Bulk generation goes through API billing (see §8).
+   Why use several: mixing generators increases query diversity, which helps synthetic retrieval data. Every row
+   records `generator` and `model` so we can ablate a source, or drop it later if its terms or quality become an
+   issue. Throughput: 50k examples ≈ 2.5k calls of 20 passages, so spreading the calls across three subscriptions
+   over a few days fits comfortably inside the usage windows.
+
+   Plan: a 2k-example pilot on each backend, then pick the mix by downstream NanoBEIR score (not by eyeballing),
+   then scale to 50k–200k.
 5. **Mixing.** Batches are homogeneous per task (in-batch negatives from the same task). Sample tasks with a
    temperature over dataset sizes.
 
@@ -138,8 +146,16 @@ burn rates from March 2026 (Google doesn't publish them, so check the Resources 
 That matches the "<$50 for the initial run" quote. Pro's 100 CU covers about a quarter of it; the rest is 2–4 top-ups.
 This assumes the ~300k-example scale above. A 100k-example first run costs about a third as much.
 
-**Pro caveats:** no background execution (that's Pro+ only), so the browser tab must stay open during runs, and
-premium GPUs are subject to availability. The §2 checkpoint and resume rules are mandatory, not optional.
+**Pro caveats:** no background execution, so the browser tab must stay open during runs, and premium GPUs are
+subject to availability. The §2 checkpoint and resume rules are mandatory, not optional.
+
+**Background execution options:**
+- **Colab Pro+** ($49.99/month, ~500–600 CU; check the signup page) adds background execution, which keeps the
+  runtime alive after the tab closes, plus higher GPU priority. Its monthly units roughly cover one full 7B run, so
+  **upgrade to Pro+ for the month of Phase 4** and stay on Pro otherwise.
+- **Colab Enterprise** (Google Cloud): fully headless notebook executions and schedules
+  (`gcloud colab executions/schedules`), billed per VM-hour at GCP rates. That's noticeably more per A100-hour than
+  consumer CUs, so use it only if we want CI-style unattended runs.
 
 **Implication:** budget roughly 3 full 7B training runs plus ~6 full evals for the whole project, and run *every*
 ablation on the 1B proxy locally with NanoBEIR first. Truncating depth (§3) is the biggest single cost lever.
@@ -177,11 +193,9 @@ olmo3-embed/
 
 ## 8. Decisions (Pete, 2026-10-04)
 
-1. **Synthetic data generator:** commercial API (Claude) for the first run. Revisit OLMo-3-32B for a fully-open v2.
-   - *Terms check before bulk generation:* Anthropic's Consumer Terms (which cover Max) restrict using outputs to
-     train AI models. The Commercial (API) Terms restrict training *competing* models. Plan on generating with an
-     API key under the Commercial Terms, not by scripting the Max subscription. Re-read the current terms before the
-     pilot.
+1. **Synthetic data generator:** Pete's subscriptions (Claude Max with Opus 5.5 as primary; Codex on ChatGPT Plus;
+   Gemini via Antigravity on Google AI Pro), multi-generator with per-row provenance (§4.4). Paid batch API is the
+   fallback; OLMo-3-Instruct is the fully-open v2.
 2. **Tracks:** train **both** A (zero-shot-clean) and B (standard practice).
 3. **Colab:** **Pro** ($9.99/month, 100 CU) plus top-ups. Target: first full 7B run plus eval for under $50 (§5).
 4. **Repo:** **private** at first. Make it public at the first T1 result or at release.
