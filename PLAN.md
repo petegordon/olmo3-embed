@@ -164,7 +164,7 @@ ablation on the 1B proxy locally with NanoBEIR first. Truncating depth (§3) is 
 
 | Phase | Where | Work | Gate to proceed |
 |---|---|---|---|
-| **0. Scaffold** | local | Repo, `uv` env (Python 3.11, torch cu128 for Blackwell sm_120), MTEB eval harness, leaderboard snapshot ✅ | `mteb` runs NanoBEIR locally on bge-base and reproduces published numbers within ±0.5 |
+| **0. Scaffold** ✅ 2026-10-04 | local | Repo, `uv` env (Python 3.12, torch 2.11 cu128 for Blackwell sm_120), MTEB eval harness, leaderboard snapshot | **Passed:** bge-base reproduces 5 published BEIR tasks within 0.31; Qwen3-0.6B within ±1.65 (run-setup noise). See `docs/phase0-harness-validation.md` |
 | **1. Baselines** | local + Colab | Eval OLMo-3-7B *untrained* (mean and last-token pooling) on NanoBEIR; eval Qwen3-Embedding-0.6B as a calibration point | Harness numbers match the leaderboard for reference models |
 | **2. Recipe on proxy** | local | OLMo-2-1B: bidirectional+MNTP vs causal, pooling, τ, negatives count, instructions; all on NanoBEIR | Recipe beats untrained by a wide margin; pick top 2 configs |
 | **3. Data** | local (+Colab for synth) | Build Track A and Track B mixes, mining, decontamination report | Data card written; zero BEIR-test overlap verified |

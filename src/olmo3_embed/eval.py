@@ -32,6 +32,9 @@ def main():
     ap.add_argument("--out", default="results")
     ap.add_argument("--dtype", choices=["float32", "bfloat16", "float16"], help="override load precision")
     ap.add_argument("--tasks", nargs="+", help="explicit task names (overrides --suite)")
+    ap.add_argument("--max-seq-length", type=int,
+                    help="cap tokens per text. On Windows, VRAM overflow silently spills into system RAM "
+                         "(driver sysmem fallback) instead of raising OOM, so cap long-doc tasks like Touche2020")
     args = ap.parse_args()
 
     if args.tasks:
@@ -41,6 +44,8 @@ def main():
     else:
         tasks = mteb.get_tasks(tasks=SUITES[args.suite], languages=["eng"])
     kwargs = {"model_kwargs": {"torch_dtype": args.dtype}} if args.dtype else {}
+    if args.max_seq_length:
+        kwargs["max_seq_length"] = args.max_seq_length
     model = mteb.get_model(args.model, **kwargs)  # uses the registered ModelMeta (prompts, pooling) when available
     mteb.evaluate(
         model,

@@ -4,7 +4,7 @@
 
 Ours:      results/**/<model>/<revision>/<Task>.json   (written by olmo3_embed.eval)
 Published: ~/.cache/mteb/remote/results/<model>/*/<Task>.json   (embeddings-benchmark/results clone)
-Scores are nDCG@10 x 100. Tasks with no published counterpart (e.g. NanoBEIR) are listed as ours-only.
+Scores are nDCG@10 x 100. Pass --ours <folder> to compare one run folder (e.g. results-fp32). Tasks with no published counterpart (e.g. NanoBEIR) are listed as ours-only.
 """
 import argparse
 import glob
@@ -35,7 +35,8 @@ def main():
     ours = {}
     for p in glob.glob(os.path.join(args.ours, "**", "*.json"), recursive=True):
         task = os.path.basename(p)[:-5]
-        model = os.path.basename(os.path.dirname(os.path.dirname(p)))
+        # <model>/<revision>/<Task>.json, or <model>/<revision>/experiments/exp_<hash>/<Task>.json for kwarg runs
+        model = next(x for x in reversed(os.path.normpath(p).split(os.sep)) if "__" in x)
         if task == "model_meta" or (v := ndcg(p)) is None:
             continue
         ours[(model, task)] = v
