@@ -19,7 +19,7 @@ def ndcg(path):
         d = json.load(open(path, encoding="utf-8"))
     except (OSError, ValueError):
         return None
-    for split in ("test", "dev"):
+    for split in ("test", "dev", "train"):  # NanoBEIR stores its eval under "train"
         for e in d.get("scores", {}).get(split, []):
             if e.get("hf_subset") in ("default", "en"):
                 return 100 * e.get("ndcg_at_10", e.get("main_score"))
