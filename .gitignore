@@ -1,0 +1,11 @@
+data/
+checkpoints/
+runs/
+wandb/
+.cache/
+*.parquet
+*.safetensors
+*.faiss
+__pycache__/
+.venv/
+.ipynb_checkpoints/
