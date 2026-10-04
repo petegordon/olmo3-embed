@@ -3,7 +3,7 @@
 Run once with `uv run --with mteb python -c "import mteb; mteb.load_results(download_latest=True)"` to clone results
 into ~/.cache/mteb, then `uv run scripts/beir_snapshot.py`.
 """
-import datetime
+import datetime, json, os, glob, statistics as st
 OUT=f"docs/beir_snapshot_{datetime.date.today()}.csv"
 R=os.path.expanduser('~/.cache/mteb/remote/results')
 T=['TRECCOVID','NFCorpus','NQ','HotpotQA','FiQA2018','ArguAna','Touche2020','CQADupstackRetrieval','QuoraRetrieval','DBPedia','SCIDOCS','FEVER','ClimateFEVER','SciFact','MSMARCO']
