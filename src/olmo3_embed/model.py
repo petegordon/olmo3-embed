@@ -79,12 +79,16 @@ class OlmoEmbedder(AbsEncoder):
         )
 
     def _tokenize(self, texts: list[str]) -> dict[str, torch.Tensor]:
+        eos = self.tokenizer.eos_token_id
         if self.pooling == "mean":
-            enc = self.tokenizer(texts, truncation=True, max_length=self.max_length, padding=True, return_tensors="pt")
-            return enc.to(self.device)
-        # last-token: truncate leaving room for EOS, append it, then pad on the right
-        ids = self.tokenizer(texts, truncation=True, max_length=self.max_length - 1)["input_ids"]
-        ids = [x + [self.tokenizer.eos_token_id] for x in ids]
+            ids = self.tokenizer(texts, truncation=True, max_length=self.max_length)["input_ids"]
+            # Empty docs exist (NanoFiQA2018 has 27) and OLMo adds no BOS, so they'd be 0 tokens; a batch of only
+            # empties (length-sorted batching puts them together) then crashes attention. Encode them as [EOS].
+            ids = [x or [eos] for x in ids]
+        else:
+            # last-token: truncate leaving room for EOS, append it, then pad on the right
+            ids = self.tokenizer(texts, truncation=True, max_length=self.max_length - 1)["input_ids"]
+            ids = [x + [eos] for x in ids]
         enc = self.tokenizer.pad({"input_ids": ids}, padding=True, return_tensors="pt")
         return enc.to(self.device)
 
