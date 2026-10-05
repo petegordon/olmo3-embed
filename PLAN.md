@@ -166,7 +166,7 @@ ablation on the 1B proxy locally with NanoBEIR first. Truncating depth (§3) is 
 |---|---|---|---|
 | **0. Scaffold** ✅ 2026-10-04 | local | Repo, `uv` env (Python 3.12, torch 2.11 cu128 for Blackwell sm_120), MTEB eval harness, leaderboard snapshot | **Passed:** bge-base reproduces 5 published BEIR tasks within 0.31; Qwen3-0.6B within ±1.65 (run-setup noise). See `docs/phase0-harness-validation.md` |
 | **1. Baselines** ✅ 2026-10-04 | local + Colab | Untrained NanoBEIR: OLMo-3-7B mean **17.35**, OLMo-2-1B mean 15.32, EOS-last ≈0 (random); refs bge-base 63.76, Qwen3-0.6B 65.66. See `docs/phase1-baselines.md` | **Passed:** harness validated (Phase 0); proxy profile tracks the 7B |
-| **2. Recipe on proxy** | local | OLMo-2-1B: bidirectional+MNTP vs causal, pooling, τ, negatives count, instructions; all on NanoBEIR | Recipe beats untrained by a wide margin; pick top 2 configs |
+| **2. Recipe on proxy** 🔶 round 1 ✅ 2026-10-05 | Colab A100 | OLMo-2-1B, 5 arms: EOS-last **54.76** avg-12 (+12.9 vs mean 41.91), no-instr 51.89, bidir 47.52, k=1 ≈ k=3. Round 2 (last+noinstr, bidir+last) queued. See `docs/phase2-results.md` | **Passed** (16.25 → 54.76); top 2 configs pending round 2 |
 | **3. Data** | local (+Colab for synth) | Build Track A and Track B mixes, mining, decontamination report | Data card written; zero BEIR-test overlap verified |
 | **4. 7B run #1** | Colab H100/A100 | Best config, Track B, LoRA, GradCache, checkpoints to Drive/Hub | NanoBEIR ≥ Qwen3-Embedding-4B's NanoBEIR; full BEIR ≥ **T1 56.6** |
 | **5. Iterate** | Colab | Depth truncation, Track A vs B, distillation, Matryoshka, checkpoint merging | Full BEIR ≥ **T2 59.5** |

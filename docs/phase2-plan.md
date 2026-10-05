@@ -1,6 +1,7 @@
 # Phase 2: contrastive recipe ablations on the proxy (OLMo-2-1B, local)
 
-**Status: DRAFT, awaiting Pete's review. Only the smoke test below has been run; no ablation arm has been trained.**
+**Status: round 1 done (2026-10-05, Colab A100). Results: `docs/phase2-results.md`. Round 2 (a8 last+noinstr,
+a3 bidir+last) queued in the notebook.**
 
 ## Goal
 Pick the 1–2 best configurations to scale to OLMo-3-7B on Colab (Phase 4) by training the 1B proxy cheaply on the
@@ -28,6 +29,7 @@ rankings should transfer, though absolute numbers won't.
 | A5 neg7 | k = 7 | more hard negatives (≈2× compute per step) |
 | A6 noinstr | no query instructions | do instructions help on out-of-domain tasks? |
 | A7 τ0.05 | temperature 0.05 | sensitivity to τ |
+| A8 last+noinstr | pooling = last, no instructions | *(added after round 1)* do the two biggest round-1 wins stack? |
 
 **Where (decided 2026-10-04): Colab A100** via `notebooks/phase2_ablations_colab.ipynb`: priority-5 proxy arms
 (~20–30 min each, expected; the notebook's timing cell measures it first), then optionally the best 1–2 arms on
