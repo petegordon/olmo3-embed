@@ -1,6 +1,6 @@
-data/
-checkpoints/
-runs/
+/data/
+/checkpoints/
+/runs/
 wandb/
 .cache/
 *.parquet
@@ -10,4 +10,3 @@ __pycache__/
 .venv/
 .ipynb_checkpoints/
 logs/
-runs/
