@@ -38,7 +38,7 @@ import pyarrow.parquet as pq
 from datasketch import MinHash, MinHashLSH
 from huggingface_hub import HfApi, hf_hub_download
 
-CACHE = "data/raw/beir_test"
+CACHE = os.path.join(os.environ.get("OLMO3_RAW", "data/raw"), "beir_test")
 BEIR = ["MSMARCO", "NQ", "HotpotQA", "FEVER", "FiQA2018", "QuoraRetrieval", "SciFact", "NFCorpus", "ArguAna", "SCIDOCS",
         "ClimateFEVER", "DBPedia", "TRECCOVID", "Touche2020"]
 QUORA_TEST = {"QuoraRetrieval", "NanoQuoraRetrieval"}
@@ -124,10 +124,23 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", default="data/trackb_v1")
     ap.add_argument("--docs", action="store_true", help="also stream test corpora: Quora doc rule + positive-doc report")
+    ap.add_argument("--manifest", default="manifests/trackb_v1_dropped_qids.txt",
+                    help="committed list of dropped qids (written by a full run, read by --apply)")
+    ap.add_argument("--apply", action="store_true",
+                    help="skip the checks: drop the manifest's qids from ingested.parquet (Colab: no test corpora needed)")
     args = ap.parse_args()
 
     df = pd.read_parquet(f"{args.data}/ingested.parquet")
     print(f"train rows: {len(df)}", flush=True)
+    if args.apply:
+        drop = set(open(args.manifest, encoding="utf-8").read().split())
+        kept = df[~df.qid.isin(drop)].reset_index(drop=True)
+        missing = len(drop) - (len(df) - len(kept))
+        if missing:  # the rebuild must be identical to the one the manifest came from
+            raise SystemExit(f"{missing} manifest qids not in ingested.parquet: rebuild differs from the manifest's")
+        kept.to_parquet(f"{args.data}/decontam.parquet", index=False, row_group_size=20_000)
+        print(f"applied {args.manifest}: kept {len(kept)} / {len(df)}")
+        return
     tests = [load_test(t, args.docs) for t in test_tasks()]
 
     # Test-query indexes: exact (normalized) and MinHash LSH
@@ -203,6 +216,9 @@ def main():
                                                for (a, b), n in sorted(overlap.items())]
 
     kept.to_parquet(f"{args.data}/decontam.parquet", index=False, row_group_size=20_000)
+    os.makedirs(os.path.dirname(args.manifest), exist_ok=True)
+    with open(args.manifest, "w", encoding="utf-8", newline="\n") as f:
+        f.write("\n".join(sorted(d["qid"] for d in dropped)) + "\n")
     pd.DataFrame(dropped).to_parquet(f"{args.data}/decontam_dropped.parquet", index=False)
     json.dump(report, open(f"{args.data}/decontam_report.json", "w", encoding="utf-8"), indent=1)
     print(f"kept {len(kept)} / {len(df)}; dropped {len(dropped)}")

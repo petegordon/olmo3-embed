@@ -29,7 +29,7 @@ import pandas as pd
 import pyarrow.parquet as pq
 from huggingface_hub import hf_hub_download, snapshot_download
 
-RAW = "data/raw"
+RAW = os.environ.get("OLMO3_RAW", "data/raw")  # Colab: local disk, not Drive
 RLHN_TASKS = {"msmarco_passage": "MSMARCO", "nq": "NQ", "hotpotqa": "HotpotQA", "fever": "FEVER", "fiqa": "FiQA2018"}
 RLHN_EXCLUDED = {"arguana", "scidocsrr"}
 BEIR_TRAIN = {"SciFact": "mteb/scifact", "NFCorpus": "mteb/nfcorpus"}
