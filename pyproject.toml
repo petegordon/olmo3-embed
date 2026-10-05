@@ -12,6 +12,7 @@ dependencies = [
   "faiss-cpu",
   "pandas",
   "pyyaml",
+  "datasketch>=2.0.0",
 ]
 
 [dependency-groups]

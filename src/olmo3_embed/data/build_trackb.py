@@ -136,7 +136,8 @@ def main():
 
     df = pd.DataFrame(rows)
     os.makedirs(args.out, exist_ok=True)
-    df.to_parquet(f"{args.out}/ingested.parquet", index=False)
+    # Small row groups: one huge group makes the nested list columns unreadable into pandas (>2 GB chunks)
+    df.to_parquet(f"{args.out}/ingested.parquet", index=False, row_group_size=20_000)
     by_task = df.groupby("task").agg(rows=("qid", "size"), avg_pos=("positives", lambda s: s.map(len).mean()),
                                      avg_neg=("negatives", lambda s: s.map(len).mean()))
     print(by_task.round(1).to_string())
