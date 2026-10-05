@@ -110,7 +110,7 @@ once.
    | **OpenAI Codex** | ChatGPT Plus ($20) | `codex exec` | 5-hour usage window on Plus (reinstated 2026-08-25) |
    | **Gemini via Antigravity** | Google AI Pro | `agy -p` / `agy --print` | Gemini CLI no longer serves AI Pro (since 2026-06-18). `agy -p` has a known hang on Windows non-TTY, so run it from WSL/Linux |
    | *(fallback)* any Batch API | pay per token | SDK | ≈ $10–20 per 50k examples (Haiku 4.5 / Sonnet 5.5 batch) |
-   | *(fully-open v2)* OLMo-3-7B/32B-Instruct | free (local / Colab) | vLLM | Slow; keeps the "all-open" claim pure |
+   | **Olmo-3.1-32B-Instruct** (fully open; decided 2026-10-05) | Colab credits | vLLM on H100/A100 80GB | No usage window; also the bulk relevance judge in Phase 3 (`docs/phase3-plan.md` §4b) |
 
    Why use several: mixing generators increases query diversity, which helps synthetic retrieval data. Every row
    records `generator` and `model` so we can ablate a source, or drop it later if its terms or quality become an
@@ -167,7 +167,7 @@ ablation on the 1B proxy locally with NanoBEIR first. Truncating depth (§3) is 
 | **0. Scaffold** ✅ 2026-10-04 | local | Repo, `uv` env (Python 3.12, torch 2.11 cu128 for Blackwell sm_120), MTEB eval harness, leaderboard snapshot | **Passed:** bge-base reproduces 5 published BEIR tasks within 0.31; Qwen3-0.6B within ±1.65 (run-setup noise). See `docs/phase0-harness-validation.md` |
 | **1. Baselines** ✅ 2026-10-04 | local + Colab | Untrained NanoBEIR: OLMo-3-7B mean **17.35**, OLMo-2-1B mean 15.32, EOS-last ≈0 (random); refs bge-base 63.76, Qwen3-0.6B 65.66. See `docs/phase1-baselines.md` | **Passed:** harness validated (Phase 0); proxy profile tracks the 7B |
 | **2. Recipe on proxy** ✅ 2026-10-05 | Colab A100 | OLMo-2-1B, 7 arms. Best: **EOS-last + no instructions, 57.51** avg-12 (mean-pool base 41.91; EOS-last alone 54.76). Bidirectional hurts with EOS (−10.4), so it's dropped; k=1 ≈ k=3. See `docs/phase2-results.md` | **Passed** (16.25 → 57.51). Top 2: a8 (last, no instr), a1 (last, instr) |
-| **3. Data** 📝 plan drafted 2026-10-05 (`docs/phase3-plan.md`) | local (+Colab for synth) | Build Track A and Track B mixes, mining, decontamination report | Data card written; zero BEIR-test overlap verified |
+| **3. Data** 📝 plan approved 2026-10-05 (`docs/phase3-plan.md`) | local (+Colab for synth) | Build Track A and Track B mixes, mining, decontamination report | Data card written; zero BEIR-test overlap verified |
 | **4. 7B run #1** | Colab H100/A100 | Best config, Track B, LoRA, GradCache, checkpoints to Drive/Hub | NanoBEIR ≥ Qwen3-Embedding-4B's NanoBEIR; full BEIR ≥ **T1 56.6** |
 | **5. Iterate** | Colab | Depth truncation, Track A vs B, distillation, Matryoshka, checkpoint merging | Full BEIR ≥ **T2 59.5** |
 | **6. Ship** | – | HF model card (training data, zero-shot stats, contamination report), `ModelMeta` PR to `embeddings-benchmark/mteb`, results PR to `embeddings-benchmark/results`, short write-up | Appears on the BEIR leaderboard |
@@ -195,7 +195,7 @@ olmo3-embed/
 
 1. **Synthetic data generator:** Pete's subscriptions (Claude Max with Opus 5.5 as primary; Codex on ChatGPT Plus;
    Gemini via Antigravity on Google AI Pro), multi-generator with per-row provenance (§4.4). Paid batch API is the
-   fallback; OLMo-3-Instruct is the fully-open v2.
+   fallback. Olmo-3.1-32B-Instruct on Colab is a fourth backend and the bulk relevance judge (decided 2026-10-05).
 2. **Tracks:** train **both** A (zero-shot-clean) and B (standard practice).
 3. **Colab:** **Pro** ($9.99/month, 100 CU) plus top-ups. Target: first full 7B run plus eval for under $50 (§5).
 4. **Repo:** **private** at first. Make it public at the first T1 result or at release.

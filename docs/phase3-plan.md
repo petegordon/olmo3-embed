@@ -1,6 +1,6 @@
 # Phase 3: training data (Track B first)
 
-**Status: DRAFT, awaiting Pete's review (2026-10-05). Nothing built yet.**
+**Status: APPROVED 2026-10-05 (decisions at the end). Nothing built yet.**
 
 ## Goal
 Replace Phase 2's 16k MS MARCO rows with a decontaminated, multi-task **Track B** mix (BEIR train splits, as E5-Mistral,
@@ -59,19 +59,51 @@ texts.
 3. **Output:** `docs/data-card.md` gets a per-source table: rows in, dropped by each rule, and rows out. The
    contamination script stays in the repo so anyone can reproduce the numbers.
 
-## 4. Hard negatives
-- **RLHN rows:** use the given negatives (already LLM-cleaned). Add one cheap guard: re-score candidates with a teacher
-  embedder and drop any negative scoring above **95% of the positive's score** (NV-Retriever's TopK-PercPos). Keep
-  the hardest remaining 7 (train samples k from those).
-- **Quora (bge-full-data):** same teacher re-score and 95% guard. No LLM cleaning exists for these rows.
-- **SciFact and NFCorpus:** full mining locally. Embed the whole corpus (under 10k docs, so minutes), take the top 100,
-  keep ranks 10–100, then apply the 95% guard.
-- **Teacher: Qwen3-Embedding-0.6B** (Apache-2.0, 65.98 NanoBEIR on our harness, fits the 12 GB laptop GPU in bf16).
-  The alternative is bge-base (63.77, MIT, with public training data), which is slightly weaker but keeps the
-  "fully open" story purer. The teacher only filters negatives, so the dependency is mild either way.
-- **Cost (laptop):** re-scoring is about 300k queries × ~25 candidates, roughly 2–4M unique passages to embed after
-  deduplication. That's a few hours overnight. Store embeddings in fp16 shards; candidate lists only, so no FAISS
-  index is needed.
+## 4. Hard negatives (decided 2026-10-05: embedder for retrieval, LLMs as judges)
+The "teacher" does two separate jobs:
+1. **Retrieval:** ranking a corpus to find candidate negatives. Only an embedder can do this at scale.
+2. **Judging:** deciding whether a candidate is really irrelevant (false-negative filtering). LLMs do this far
+   better than embedding scores, which is RLHN's whole result.
+
+**4a. Embedder (retrieval + cheap guard), laptop GPU.** Qwen3-Embedding-0.6B (Apache-2.0, 65.98 NanoBEIR on our
+harness, fits 12 GB in bf16).
+- Re-score every row's candidates and drop any negative above **95% of the positive's score** (NV-Retriever's
+  TopK-PercPos). Keep the hardest remaining 7; training samples k from those.
+- **SciFact and NFCorpus:** full mining. Embed the whole corpus (under 10k docs, minutes), take the top 100, and keep
+  ranks 10–100 before the guard.
+- **Cost:** about 300k queries × ~25 candidates, roughly 2–4M unique passages after dedup. A few hours overnight,
+  stored as fp16 shards. Candidate lists only, so no FAISS index is needed.
+
+**4b. LLM judge cascade, on the rows nobody has LLM-judged.** RLHN rows (~80% of the mix) were already judged by
+GPT-4o-mini → GPT-4o, so re-judging them would mostly repeat that work. The cascade covers **Quora, SciFact and
+NFCorpus**, on the negatives most likely to be false: the top 3 per query with embedder score between 80% and 95% of
+the positive. That's about 190k (query, positive, candidate) judgments.
+
+| Stage | Judge | Where | Covers |
+|---|---|---|---|
+| 1. Bulk | **`allenai/Olmo-3.1-32B-Instruct`** (Apache-2.0, latest OLMo instruct) | Colab H100 80GB or A100 80GB, vLLM, bf16 | **All** ~190k candidates. Fully-open labels for the bulk |
+| 2. Verify | Claude Opus 5.5 (Max) | `claude -p` | Every pair OLMo flags as relevant, plus a 2% random sample of OLMo's "irrelevant" calls (calibration) |
+| 3. Tie-break | Codex (Plus) and Gemini (AI Pro) | `codex exec`, `agy -p` | Pairs where OLMo and Claude disagree |
+
+- **Decision rule:** a candidate counts as a false negative if 2 of the judges who saw it agree (with Codex and
+  Gemini voting only on disagreements). False negatives are dropped as negatives. On SciFact and NFCorpus, where
+  queries have few labeled positives, they're also added as extra positives (RLHN's "relabel" variant).
+- **Batching:** about 25 pairs per call. On average, a pair is a short query plus two ~150-token passages.
+  - The OLMo bulk pass is roughly 35M input tokens. That's a few H100-hours with vLLM prefix caching (the
+    instructions and query repeat across a call's pairs).
+  - The frontier calls depend on OLMo's flag rate. At 10%, that's ~19k pairs ≈ 800 `claude -p` calls, which fits
+    comfortably in the Max windows.
+- **Provenance:** every label records the judge, the model id and version, the prompt hash and the raw verdict. The
+  data card reports per-judge agreement.
+- **Pilot first:** 500 Quora queries (~1.5k pairs) judged by **all four** models.
+  - Measure pairwise agreement, the false-negative rate, and whether OLMo-3.1-32B tracks the frontier judges well
+    enough to be the bulk judge.
+  - If OLMo agrees poorly (under ~0.8 with Claude), swap the roles: Claude becomes the bulk judge on a smaller slice,
+    and OLMo becomes a secondary vote.
+  - If the false-negative rate is tiny, the embedder guard alone is enough, and stages 2–3 are skipped.
+- **Colab cost:** an H100 burn rate is unpublished, so measure it in the pilot. On an A100 80GB (~7.5 CU/h), 4 h ≈
+  30 CU ≈ $3. vLLM gets **its own notebook and runtime**, since its torch pin can clash with the training stack.
+- **Fallback:** `Olmo-3-7B-Instruct` fits an A100 40GB, if the 32B is too slow or no 80GB GPU is available.
 
 ## 5. Training-code changes (small, testable)
 1. **Schema:** `query, positives[], negatives[] (ranked), task, instruction, source`. Phase 2 parquet still loads
@@ -103,8 +135,9 @@ ClimateFEVER is only partly held out because FEVER is related, so it's also repo
 | B2 | B1 + `per_task` instructions | 125 | Do instructions help once they match eval? | 26 min |
 | B3 | Track B v1, 64k rows | 500 | Does more data keep paying on the proxy? | ~1.5 h |
 | B4 | B1 with `rlhn/default` (uncleaned) | 125 | Is RLHN's relabeling worth it for us? | 26 min |
+| B5 | B1 without the §4b LLM judging (embedder guard only) | 125 | Is the judge cascade worth it on Quora, SciFact and NFCorpus? | 26 min |
 
-Total is about 3 h ≈ 17 CU ≈ $1.70. Same single-seed caveats as Phase 2.
+Total is about 3.5 h ≈ 20 CU ≈ $2. Same single-seed caveats as Phase 2.
 
 **Gate to Phase 4:**
 - Data card written, with zero BEIR test-query overlap verified.
@@ -114,27 +147,33 @@ Total is about 3 h ≈ 17 CU ≈ $1.70. Same single-seed caveats as Phase 2.
 ## 7. Later in Phase 3 (after the gate)
 - **Track A (zero-shot-clean):** drop every BEIR-derived source. Use non-BEIR pairs (StackExchange, S2ORC, PAQ, ELI5,
   NLI from `cfli/bge-full-data` / `bge-e5data`) plus synthetic data.
-- **Synthetic pilot (PLAN §4.4):** passage → query generation, with 2k examples per backend (Claude, Codex, Gemini).
-  Pick the mix by downstream NanoBEIR avg-OOD-5, not by reading samples.
+- **Synthetic pilot (PLAN §4.4):** passage → query generation, with 2k examples per backend. **Olmo-3.1-32B-Instruct
+  on Colab joins Claude, Codex and Gemini as a fourth backend** (no usage windows, fully open, the same vLLM notebook
+  as §4b). Pick the mix by downstream NanoBEIR avg-OOD-5, not by reading samples. Because OLMo has no usage cap,
+  it's the natural source for scaling up if its pilot score is competitive.
 - **Dolma 3 contamination report** for the data card. This is heavy; defer to Phase 6 unless an existing index
   (infini-gram / OLMoTrace) makes it cheap.
 
 ## 8. Order of work
 1. `data/build_trackb.py`: ingest RLHN, bge `quora`, and BEIR SciFact/NFCorpus train → unified parquet (laptop, CPU).
 2. `data/decontam.py` + test index → drops + data card numbers.
-3. `data/rescore.py`: Qwen3-0.6B teacher re-score + 95% guard; mine SciFact/NFCorpus (laptop GPU, overnight).
-4. `train.py` changes + tests (§5).
-5. Proxy runs B1–B4 on Colab → `docs/phase3-results.md`.
+3. `data/rescore.py`: Qwen3-0.6B re-score + 95% guard; mine SciFact/NFCorpus (laptop GPU, overnight).
+4. `data/judge/`: one shared prompt and JSON verdict schema, with one adapter per backend (`vllm` for OLMo,
+   `claude -p`, `codex exec`, `agy -p`), plus resumable sharded outputs. Also
+   `notebooks/phase3_olmo_judge_colab.ipynb`. Run the 500-query pilot, then the cascade (§4b).
+5. `train.py` changes + tests (§5).
+6. Proxy runs B1–B5 on Colab → `docs/phase3-results.md`.
 
-## Decisions for Pete
-1. **Exclude ArguAna and SciDocsRR** from Track B v1, even though bge-en-icl and NV-Embed use ArguAna?
-   *Recommend: exclude* (no BEIR train split exists for either).
-2. **Include Quora** (no BEIR train split, but standard practice), with strict decontamination?
-   *Recommend: include* and report the overlap.
-3. **Teacher for re-scoring:** Qwen3-Embedding-0.6B (stronger) or bge-base (more open)?
-   *Recommend: Qwen3-0.6B*, disclosed in the data card.
-4. **RLHN is CC-BY-SA-4.0.** Training on it is fine. If we later publish our processed mix, it has to be CC-BY-SA too.
-   *Recommend: accept.*
+Steps 1–3 and 5 don't depend on the judges, so the judge work (step 4) can run in parallel.
+
+## Decisions (Pete, 2026-10-05)
+1. **Exclude ArguAna and SciDocsRR** from Track B v1 (no BEIR train split exists for either).
+2. **Include Quora**, with strict decontamination; report the overlap.
+3. **Qwen3-Embedding-0.6B** for retrieval and the 95% guard, disclosed in the data card.
+4. **RLHN's CC-BY-SA-4.0 is fine.** A processed mix we publish has to be CC-BY-SA too. The terms of the frontier
+   models' outputs (judge labels, synthetic data) were also reviewed and judged fine.
+5. **LLM judges:** **Olmo-3.1-32B-Instruct on Colab** is the bulk judge and a synthetic-data backend. Claude Opus 5.5
+   verifies, and Codex and Gemini break ties (§4b).
 
 ## Research notes (2026-10-05)
 - **BEIR train splits exist for:** MS MARCO, NQ, HotpotQA, FiQA, FEVER, SciFact, NFCorpus (BEIR README; `mteb/nq` only
