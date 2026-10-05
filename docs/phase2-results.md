@@ -1,5 +1,9 @@
 # Phase 2 results: recipe ablations on the 1B proxy (2026-10-05)
 
+**Bottom line:** EOS last-token pooling + no instructions (**a8: 57.51 NanoBEIR avg-12**, up from 16.25 untrained and
+41.91 for the mean-pooling base) is the recipe to scale to the 7B. Bidirectional attention is dropped. See
+[Phase 2 decision](#phase-2-decision).
+
 Round 1: the 5 priority arms from `docs/phase2-plan.md`. Each arm is `configs/proxy-base.yaml` with a single override:
 OLMo-2-0425-1B, LoRA r=16, 16k MS MARCO queries, 125 steps at batch 128, τ=0.02. Trained and evaluated on a Colab
 A100 40GB (`notebooks/phase2_ablations_colab.ipynb`). Scores are NanoBEIR nDCG@10 (×100), max 512 tokens.
@@ -47,17 +51,53 @@ References on the same harness (Phase 1): bge-base 63.76 / 63.77 (avg-13 / avg-1
 - **Caveats:** one seed, 50 queries per task, 16k MS MARCO examples. Each arm changed one thing from a0, so the
   effects may not add up. Round 2 tests that.
 
-## Round 2 (queued)
-Added to the notebook (`RUN_ARMS`):
-- **a8-last-noinstr** (`pooling=last instructions=false`): do the two biggest wins stack?
-- **a3-bidir-last** (`bidirectional=true pooling=last`): does bidirectional attention help on top of EOS pooling?
+## Round 2 (2026-10-05): do the winners stack?
+Same setup and A100. a8 = `pooling=last instructions=false`; a3 = `bidirectional=true pooling=last`.
 
-**Provisional 7B recipe** (until round 2 lands): causal attention, EOS last-token pooling, k=1–3 hard negatives,
-and query instructions only once training covers many tasks with varied instructions.
+| Task | a1 last (round 1 best) | **a8 last + noinstr** | a3 bidir + last |
+|---|---:|---:|---:|
+| ArguAna | 54.71 | **56.64** | 28.71 |
+| ClimateFever | 28.99 | **31.91** | 22.60 |
+| DBPedia | 51.50 | **52.23** | 48.31 |
+| FEVER | 77.35 | **85.10** | 55.99 |
+| FiQA2018 | 46.25 | **51.90** | 35.25 |
+| HotpotQA | 66.53 | **75.73** | 54.55 |
+| MSMARCO *(in-domain)* | 47.19 | **57.10** | 51.83 |
+| NFCorpus | 30.13 | **32.33** | 25.19 |
+| NQ | **56.73** | 55.92 | 56.12 |
+| Quora | **93.36** | 90.35 | 79.42 |
+| SCIDOCS | 33.41 | **36.02** | 26.12 |
+| SciFact | **69.96** | 68.71 | 56.72 |
+| Touche2020 | 48.19 | **53.28** | 42.91 |
+| **avg-13** | 54.18 | **57.48** | 44.90 |
+| **avg-12 (primary)** | 54.76 | **57.51** | 44.32 |
+| Δ avg-12 vs a1 | – | **+2.75** | −10.44 |
+
+- **The two wins stack.** a8 is the new best at **57.51 avg-12** (+15.6 over a0). It beats a1 on 9 of 12 out-of-domain
+  tasks and loses only slightly on Quora, SciFact and NQ. The gain is smaller than the sum of the two single effects
+  (+12.9 and +10.0), so they partly overlap.
+- **Bidirectional attention clearly hurts with EOS pooling (−10.4 vs a1).** It loses on all 12 out-of-domain tasks
+  (only narrowly on NQ, −0.6). With mean pooling it helped (+5.6), which fits the picture: removing the causal mask without MNTP adaptation
+  disrupts the final-token state, while mean pooling averages over it. Pursuing bidirectional attention would mean
+  adding the MNTP warm-up and going back to mean pooling, and even then it would need to beat a8's 57.5. That isn't
+  worth it at this stage, so drop it.
+
+## Phase 2 decision
+**7B recipe:** causal attention, EOS last-token pooling, no query instructions while training on MS MARCO alone, k=1–3
+hard negatives (k=1 is ~45% cheaper per step at equal quality on the proxy), τ=0.02.
+
+- **Instructions:** reintroduce them as an ablation in Phase 3, once training covers many tasks with varied instructions
+  (the train/eval mismatch explanation above).
+- **Runner-up config:** a1 (last + instructions), as the control for that Phase 3 ablation.
+- **Distance to the reference models:** a8 is still 8.5 points below Qwen3-Embedding-0.6B (65.98) on the same harness.
+  Expected after 16k MS MARCO examples; Phase 3 data and the 7B are the levers.
+- **Optional before Phase 3:** a7 (τ=0.05) and a5 (k=7) remain untested, but they are cheap to re-tune later and
+  unlikely to change the recipe.
 
 ## Cost / ops notes
 - A100 40GB: ~25 min per k=3 arm (16 min for k=1), with eval taking ~5 min of that; 5 arms ≈ 1 h 50 min ≈ 10 CU.
-  That's ~4× faster than the laptop estimate (1 h 50 min per arm).
+  That's ~4× faster than the laptop estimate (1 h 50 min per arm). Round 2 (2 arms on a fresh runtime, including
+  setup) took ≈ 1 h ≈ 5–6 CU. All of Phase 2 cost ≈ 16 CU (≈ $1.60).
 - Fixes found by this run: the `data/` gitignore pattern was swallowing `src/olmo3_embed/data/`; IPython skips `{VAR}`
   expansion on a `!` line that also has `$var`; Colab's preinstalled torchao 0.10 blocks importing peft ≥ 0.21; a split
   `print(f'…` line in the notebook; `compare_published.py` crashed on `results/run_logs/*.json`.

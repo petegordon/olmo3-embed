@@ -1,7 +1,6 @@
 # Phase 2: contrastive recipe ablations on the proxy (OLMo-2-1B, local)
 
-**Status: round 1 done (2026-10-05, Colab A100). Results: `docs/phase2-results.md`. Round 2 (a8 last+noinstr,
-a3 bidir+last) queued in the notebook.**
+**Status: done (2026-10-05, Colab A100, rounds 1 and 2). Results and decision: `docs/phase2-results.md`.**
 
 ## Goal
 Pick the 1–2 best configurations to scale to OLMo-3-7B on Colab (Phase 4) by training the 1B proxy cheaply on the
