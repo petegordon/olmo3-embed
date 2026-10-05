@@ -62,6 +62,10 @@ def main():
             print(f"  {task:<28}{v:8.2f}{pub:11.2f}{delta:+8.2f}{flag}")
         if nano:
             print(f"  {'NanoBEIR avg (' + str(len(nano)) + ' tasks)':<28}{sum(nano) / len(nano):8.2f}")
+            # MS MARCO-trained runs are in-domain on NanoMSMARCO; avg-12 is the Phase 2 primary metric
+            no_ms = [v for (m, t), v in ours.items() if m == model and t.startswith("Nano") and "MSMARCO" not in t]
+            if len(no_ms) == len(nano) - 1:
+                print(f"  {'NanoBEIR avg-12 (no MSMARCO)':<28}{sum(no_ms) / len(no_ms):8.2f}")
     print(f"\n{'PASS' if not fails else f'{fails} task(s) outside ±{args.tol}'}")
 
 

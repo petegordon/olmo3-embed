@@ -29,7 +29,12 @@ rankings should transfer, though absolute numbers won't.
 | A6 noinstr | no query instructions | do instructions help on out-of-domain tasks? |
 | A7 τ0.05 | temperature 0.05 | sensitivity to τ |
 
-Run: `scripts/phase2_ablations.sh` (all arms) or `scripts/phase2_ablations.sh a0-base a2-bidir` (some). Each arm
+**Where (decided 2026-10-04): Colab A100** via `notebooks/phase2_ablations_colab.ipynb`: priority-5 proxy arms
+(~20–30 min each, expected; the notebook's timing cell measures it first), then optionally the best 1–2 arms on
+OLMo-3-7B. Checkpoints and data live on Google Drive; results are pushed to `colab-results` after each arm.
+On A100 the 1B arms skip gradient checkpointing (math-neutral).
+
+Local alternative: `scripts/phase2_ablations.sh` (all arms) or `scripts/phase2_ablations.sh a0-base a2-bidir` (some). Each arm
 trains, then evaluates. Both steps resume after an interruption.
 
 ## Decision rule
