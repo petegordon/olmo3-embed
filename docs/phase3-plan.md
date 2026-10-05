@@ -1,6 +1,7 @@
 # Phase 3: training data (Track B first)
 
-**Status: APPROVED 2026-10-05 (decisions at the end). Nothing built yet.**
+**Status: APPROVED 2026-10-05 (decisions at the end). In progress: steps 1–2 done, step 3 built and paused.
+See [Progress and resume notes](#progress-and-resume-notes).**
 
 ## Goal
 Replace Phase 2's 16k MS MARCO rows with a decontaminated, multi-task **Track B** mix (BEIR train splits, as E5-Mistral,
@@ -165,6 +166,66 @@ Total is about 3.5 h ≈ 20 CU ≈ $2. Same single-seed caveats as Phase 2.
 6. Proxy runs B1–B5 on Colab → `docs/phase3-results.md`.
 
 Steps 1–3 and 5 don't depend on the judges, so the judge work (step 4) can run in parallel.
+
+## Progress and resume notes
+
+### State at pause (2026-10-05, ~09:03 local)
+
+**Step 1, ingest: ✅** `src/olmo3_embed/data/build_trackb.py` produces 389,348 rows; counts are in `docs/data-card.md`.
+- It's deterministic: the Colab rebuild reproduced the laptop build exactly.
+- Raw downloads go to `$OLMO3_RAW` (default `data/raw`; `/content/raw` on Colab).
+
+**Step 2, decontamination: ✅** `src/olmo3_embed/data/decontam.py` keeps 373,762 rows.
+- Zero training queries match a test query across 39 test sets.
+- Quora lost 26% of its rows to test overlap.
+- The dropped qids are committed in `manifests/trackb_v1_dropped_qids.txt`. `decontam --apply` reproduces the kept
+  set without the 16 GB of test corpora (verified identical on the laptop and on Colab).
+
+**Step 3, rescore: built, tested, paused before any real work.**
+- **Code:** `src/olmo3_embed/data/rescore.py` and `notebooks/phase3_rescore_colab.ipynb`.
+- **Smoke test** (800 rows, laptop) passes. The embedding shards resume correctly: a fingerprint of the text list is
+  in the shard names, so stale shards can't be reused.
+- **Colab bench, A100-SXM4-80GB (High-RAM):** 437 docs/s at batch 512 with 20 GB peak, so **~3.3 h** for the job.
+  - The burn rate, read from the Resources panel, is **6.77 units/h**, so the full run costs **≈ 22.5 units (≈ $2.25)**.
+  - Laptop RTX 5070 Ti, for comparison: 137 docs/s (~10 h).
+  - No H100 was available, so its rate and throughput are still unmeasured.
+- **Job size:** 4,863,468 unique passages after mining SciFact/NFCorpus and capping candidates at 30 per row, plus
+  373,762 queries.
+- **The paused run:** stopped 2¾ minutes in, right after mining and before the first embedding shard finished. The
+  runtime is deleted (shards were on local disk, so nothing was lost), and nothing has been written to Drive yet.
+- **Units:** 357.58 left as of 08:56.
+
+### To resume step 3
+1. Open `notebooks/phase3_rescore_colab.ipynb` from GitHub in Colab.
+2. Runtime → Change runtime type: **H100** if offered, otherwise **A100**.
+3. Run all, then the per-runtime prompts:
+   - Accept the "not authored by Google" warning.
+   - The Drive consent: Pete approves it. If `drive.mount` times out while consent is in progress, Run all again.
+   - `HF_TOKEN` access for this notebook is already granted.
+4. The data cell rebuilds Track B in about 5 minutes. The bench cell prints `BENCH …`; read the units/h from Resources
+   to price the run.
+5. The full cell takes about 3.3 h on an A100 80GB, and **the tab must stay open** (Pro has no background
+   execution). It writes `MyDrive/olmo3-embed/data/trackb_v1/rescored.parquet` and pushes `rescored_stats.json` to
+   `colab-results`.
+   - Shards are only resumable within the same runtime, because they live on local disk. A lost runtime restarts
+     the embedding.
+
+### Optional before resuming: speed-ups (not done)
+The A100 ran at roughly 20% of its peak FLOPs, which suggests a tokenizer or attention bottleneck rather than a
+compute limit. Candidates:
+- `attn_implementation="flash_attention_2"` for the teacher, if flash-attn installs on the Colab image.
+- Pre-tokenizing in a DataLoader with workers.
+- Larger batches by length bucket.
+
+Expect maybe 1.5–2× faster, saving about 10 units. Worth doing before the larger OLMo judge job (§4b) anyway. Bench
+it with `--bench 20000` against the 437 docs/s baseline.
+
+### After step 3
+- **Step 4, LLM judge:** `data/judge/`, the 500-query pilot with all four judges, then the cascade. The vLLM notebook
+  isn't written yet.
+- **Step 5, `train.py` changes (§5):** these don't depend on steps 3–4, so they can be done on the laptop meanwhile.
+- **Step 6:** proxy runs B1–B5.
+- **Ops plan** (`docs/colab-hf-storage-plan.md`): still waiting on a write-scoped HF token.
 
 ## Decisions (Pete, 2026-10-05)
 1. **Exclude ArguAna and SciDocsRR** from Track B v1 (no BEIR train split exists for either).
