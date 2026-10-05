@@ -1,0 +1,19 @@
+# Phase 2 baseline arm (A0). Every ablation = this file + one --set override (see docs/phase2-plan.md).
+run_name: p2-a0-base
+model: allenai/OLMo-2-0425-1B
+data: data/msmarco_cocondenser_50k.parquet
+n_examples: 16000          # same 16k rows for every arm -> 125 steps at batch 128
+pooling: mean
+bidirectional: false
+instructions: true
+max_len_query: 64
+max_len_doc: 256
+num_negatives: 3
+temperature: 0.02
+batch_size: 128
+chunk_size: 32
+lora_r: 16
+lora_alpha: 32
+lr: 1.0e-4
+warmup_ratio: 0.05
+seed: 0

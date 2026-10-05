@@ -26,7 +26,7 @@ SUITES = {
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--model", required=True)
+    ap.add_argument("--model", help="HF model id (not needed with --run)")
     ap.add_argument("--suite", choices=SUITES, default="nano")
     ap.add_argument("--batch-size", type=int, default=32)
     ap.add_argument("--out", default="results")
@@ -35,6 +35,7 @@ def main():
     ap.add_argument("--max-seq-length", type=int,
                     help="cap tokens per text. On Windows, VRAM overflow silently spills into system RAM "
                          "(driver sysmem fallback) instead of raising OOM, so cap long-doc tasks like Touche2020")
+    ap.add_argument("--run", help="trained run dir (runs/<name>): loads its adapter + embed_config.json")
     ap.add_argument("--olmo-pooling", choices=["mean", "last"],
                     help="use our OlmoEmbedder (model.py) instead of mteb's registered loader")
     ap.add_argument("--no-instructions", action="store_true", help="OlmoEmbedder: no query instructions")
@@ -47,7 +48,13 @@ def main():
         tasks = mteb.get_benchmark("BEIR").tasks
     else:
         tasks = mteb.get_tasks(tasks=SUITES[args.suite], languages=["eng"])
-    if args.olmo_pooling:
+    if args.run:
+        from olmo3_embed.model import OlmoEmbedder
+
+        model = OlmoEmbedder.from_run(
+            args.run, max_length=args.max_seq_length or 512, batch_size=args.batch_size, dtype=args.dtype,
+        )
+    elif args.olmo_pooling:
         from olmo3_embed.model import OlmoEmbedder
 
         model = OlmoEmbedder(
