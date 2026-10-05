@@ -197,7 +197,7 @@ def main():
                 doc_index[k].append(c["task"])
         overlap = collections.Counter()
         for r in kept.itertuples(index=False):
-            for t in {tt for p in r.positives for tt in doc_index.get(h(p), [])}:
+            for t in {tt for p in r.positives if p.strip() for tt in doc_index.get(h(p), [])}:
                 overlap[(r.task, t)] += 1
         report["positive_doc_overlap_rows"] = [{"train_task": a, "test_task": b, "rows": n}
                                                for (a, b), n in sorted(overlap.items())]

@@ -56,7 +56,7 @@ def ingest_rlhn(msmarco_cap: int, seed: int, stats: dict) -> list[dict]:
                     stats[f"rlhn:{sub}"]["dup_query_id"] += 1
                     continue
                 seen.add(key)
-                pos = [doc(p["title"], p["text"]) for p in r["positive_passages"]]
+                pos = [d for d in (doc(p["title"], p["text"]) for p in r["positive_passages"]) if d]  # FiQA has empty docs
                 if not pos or not r["query"].strip():
                     stats[f"rlhn:{sub}"]["empty"] += 1
                     continue
