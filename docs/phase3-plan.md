@@ -36,8 +36,8 @@ Instructions get re-tested here (§5), because the multi-task mix finally gives 
 | NFCorpus | BEIR train qrels | ~2.6k queries | Negatives mined locally (§4) |
 | **Total** | | **≈ 390k → ~300k after caps/decontam** | Matches the PLAN §5 budget for 7B run #1 |
 
-Row counts are the `cfli/bge-full-data` subset sizes. RLHN-680K's per-subset counts aren't published, so step 1 of
-§8 measures them, and the caps get adjusted then.
+Measured RLHN-680K counts (2026-10-05): MS MARCO 455,748 · HotpotQA 84,395 · NQ 57,539 · FEVER 28,869 · FiQA 5,496
+(plus ArguAna 4,065 and SciDocsRR 12,654, both excluded). The caps above stand.
 
 **Excluded from v1, on purpose:**
 - **ArguAna and SciDocsRR** (both in RLHN and BGE): BEIR has *no* train split for either, so these rows overlap the
