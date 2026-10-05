@@ -36,8 +36,9 @@ def main():
     for p in glob.glob(os.path.join(args.ours, "**", "*.json"), recursive=True):
         task = os.path.basename(p)[:-5]
         # <model>/<revision>/<Task>.json, or <model>/<revision>/experiments/exp_<hash>/<Task>.json for kwarg runs
-        model = next(x for x in reversed(os.path.normpath(p).split(os.sep)) if "__" in x)
-        if task == "model_meta" or (v := ndcg(p)) is None:
+        # Files outside a <model> folder (e.g. results/run_logs/<run>/embed_config.json) aren't MTEB results
+        model = next((x for x in reversed(os.path.normpath(p).split(os.sep)) if "__" in x), None)
+        if model is None or task == "model_meta" or (v := ndcg(p)) is None:
             continue
         ours[(model, task)] = v
 
