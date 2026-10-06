@@ -14,6 +14,10 @@ def test_parse_tolerates_fences_and_ignores_unknown_ids():
           ' {"id": "b", "relevant": "yes"}]}\n```'
     assert parse(raw, ["a", "b"]) == {"a": True}  # "yes" isn't a bool -> b left for retry
     assert parse("no json here", ["a"]) == {}
+    # an echoed prompt (whose template has braces and a placeholder verdicts object) before the real answer
+    echoed = build("QuoraRetrieval", "q", "p", [{"id": "a", "candidate": "c"}]) + \
+        '\ncodex\n{"verdicts": [{"id": "a", "relevant": false}]}\ntokens used 1,890'
+    assert parse(echoed, ["a"]) == {"a": False}
 
 
 def test_build_contains_ids_and_clips():

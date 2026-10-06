@@ -6,6 +6,7 @@
   gemini  Antigravity CLI on Google AI Pro:    agy -p <prompt>   (hangs without a TTY on Windows: run from WSL/Linux)
 """
 import json
+import os
 import shutil
 import subprocess
 
@@ -28,13 +29,29 @@ class VLLM:
         return [o.outputs[0].text for o in self.llm.chat(msgs, self.params, use_tqdm=True)]
 
 
-class CLI:
-    """Base for subscription CLIs: one subprocess per prompt (prompt on stdin), sequential to respect usage windows."""
-    name, exe = "cli", ""
+def find_exe(exe: str) -> str | None:
+    """PATH first, then the per-user install dirs (npm global, Antigravity) so a fresh install works before the
+    shell/IDE is restarted."""
+    hit = shutil.which(exe)
+    if hit:
+        return hit
+    for d in (os.path.join(os.environ.get("APPDATA", ""), "npm"),
+              os.path.join(os.environ.get("LOCALAPPDATA", ""), "agy", "bin"), os.path.expanduser("~/.local/bin")):
+        hit = shutil.which(exe, path=d)
+        if hit:
+            return hit
+    return None
 
-    def __init__(self, model: str | None = None, timeout: int = 600):
-        if not shutil.which(self.exe):
-            raise RuntimeError(f"{self.exe!r} not on PATH: install and sign in to it first")
+
+class CLI:
+    """Base for subscription CLIs: one subprocess per prompt, sequential to respect usage windows.
+    The prompt goes on stdin unless the subclass sets prompt_arg (then it's the last argv item)."""
+    name, exe, prompt_arg = "cli", "", False
+
+    def __init__(self, model: str | None = None, timeout: int = 900):
+        self.path = find_exe(self.exe)
+        if not self.path:
+            raise RuntimeError(f"{self.exe!r} not found: install and sign in to it first")
         self.model, self.timeout = model, timeout
 
     def cmd(self) -> list[str]:
@@ -46,8 +63,9 @@ class CLI:
     def __call__(self, prompts: list[str]) -> list[str]:
         out = []
         for p in prompts:
-            r = subprocess.run(self.cmd(), input=p, capture_output=True, text=True, encoding="utf-8",
-                               timeout=self.timeout)
+            argv = [self.path] + self.cmd() + ([p] if self.prompt_arg else [])
+            r = subprocess.run(argv, input=None if self.prompt_arg else p, stdin=subprocess.DEVNULL if self.prompt_arg
+                               else None, capture_output=True, text=True, encoding="utf-8", timeout=self.timeout)
             if r.returncode != 0:
                 raise RuntimeError(f"{self.exe} exited {r.returncode}: {r.stderr[-500:]}")
             out.append(self.text(r.stdout))
@@ -58,24 +76,35 @@ class Claude(CLI):
     name, exe = "claude", "claude"
 
     def cmd(self):
-        return ["claude", "-p", "--output-format", "json"] + (["--model", self.model] if self.model else [])
+        return ["-p", "--output-format", "json"] + (["--model", self.model] if self.model else [])
 
     def text(self, stdout):
         return json.loads(stdout).get("result", "")
 
 
 class Codex(CLI):
+    """codex exec: the final message on stdout, the transcript on stderr."""
     name, exe = "codex", "codex"
 
     def cmd(self):
-        return ["codex", "exec", "-"] + (["--model", self.model] if self.model else [])
+        return ["exec", "-"] + (["--model", self.model] if self.model else [])
 
 
 class Gemini(CLI):
-    name, exe = "gemini", "agy"
+    """agy -p needs the prompt as an argument (no stdin), so keep prompts well under Windows' 32k-char command line:
+    judge with --batch 10. Non-TTY print mode works in agy 1.3.0 (the 1.0.6 hang, issue #318, is gone)."""
+    name, exe, prompt_arg = "gemini", "agy", True
+
+    def __init__(self, model: str | None = None, timeout: int = 900):
+        super().__init__(model, timeout)
+        self.model = model or "agy-default"
 
     def cmd(self):
-        return ["agy", "-p"] + (["--model", self.model] if self.model else [])
+        return ["--output-format", "json", "--disable-slash-commands"] + (
+            ["--model", self.model] if self.model != "agy-default" else []) + ["-p"]
+
+    def text(self, stdout):
+        return json.loads(stdout).get("response", "")
 
 
 BACKENDS = {"vllm": VLLM, "claude": Claude, "codex": Codex, "gemini": Gemini}

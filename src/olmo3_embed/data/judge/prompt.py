@@ -55,12 +55,13 @@ PROMPT_SHA = hashlib.sha1((TEMPLATE + json.dumps(DEFINITIONS, sort_keys=True)).e
 def parse(text: str, ids: list[str]) -> dict[str, bool]:
     """Verdicts for the expected ids. Tolerates code fences and prose around the JSON; unknown ids are ignored,
     missing ids are simply absent (the caller retries them)."""
-    m = re.search(r"\{.*\}", text, re.S)
-    if not m:
-        return {}
-    try:
-        obj = json.loads(m.group(0))
-    except json.JSONDecodeError:
+    obj, dec = None, json.JSONDecoder()
+    for m in re.finditer(r'\{\s*"verdicts"', text):  # the last decodable {"verdicts": ...} object wins
+        try:
+            obj = dec.raw_decode(text, m.start())[0]
+        except json.JSONDecodeError:
+            continue
+    if obj is None:
         return {}
     out = {}
     for v in obj.get("verdicts", []) if isinstance(obj, dict) else []:
