@@ -102,6 +102,34 @@ rows) is why ClimateFEVER counts as only partly held out. **Track A will drop al
 - **Output:** `MyDrive/olmo3-embed/data/trackb_v1/rescored.parquet` (2.5 GB). The stats are on `colab-results` in
   `results/data/trackb_v1/rescored_stats.json`.
 
+## LLM judge pilot (2026-10-06)
+**Setup:** `python -m olmo3_embed.data.judge.run`, run on 500 random Quora queries.
+- **Pairs:** every candidate scoring 80–95% of the positive, 2,650 pairs in all (366 queries had at least one).
+- **Prompt:** one shared prompt for all judges, with the query's known positive as an example of "relevant".
+- **Raw verdicts:** on the `colab-results` branch in `results/judge/`.
+
+| Judge | Where | Judged | Flags as false negative | Kappa vs Claude |
+|---|---|---:|---:|---:|
+| Claude Opus 5.5 (Max) | laptop, `claude -p` | 2,650 | 50 (1.9%) | — |
+| Codex (ChatGPT Plus) | laptop, `codex exec` | 2,650 | 48 (1.8%) | **0.65** |
+| OLMo-3.1-32B-Instruct | Colab A100 80GB, vLLM | 2,645 | 94 (3.6%) | 0.15 |
+| Gemini via Antigravity (AI Pro) | laptop, `agy -p` | 933 (partial) | 1 (0.1%) | 0.14 |
+
+**Speed:**
+- OLMo judged all 369 prompts in 1 min 39 s.
+- The subscription CLIs manage about 3.7 prompts/min each (Gemini about 2.5/min, with batches of 10).
+
+**Findings:**
+- **Real false negatives are rare.** Claude and Codex agree on just 32 pairs (1.2%), touching 28 of 366 queries.
+- **OLMo-3.1-32B isn't a usable bulk judge here.** It flags topically related but different questions ("How can I
+  sex for long time?" vs "What is the average duration of sex?"), finds only 8 of the 32 agreed false negatives, and
+  only 8 of its 94 flags are right.
+- **Gemini (the Antigravity default model) almost never flags anything.**
+- **Embedding scores can't isolate the false negatives.** Lowering the guard from 0.95 to 0.90 drops 14.7% of band
+  candidates but catches only 6 of the 32; at 0.85 it drops 46.5% to catch 20.
+
+**Consequence for Track B v1:** see the plan's progress notes (§4b decision).
+
 ## Still to add
 - LLM judge pass on Quora, SciFact and NFCorpus: OLMo-3.1-32B-Instruct for the bulk, Claude to verify, Codex and Gemini
   to break ties. Per-judge agreement goes here.

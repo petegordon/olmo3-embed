@@ -185,8 +185,17 @@ Steps 1–3 and 5 don't depend on the judges, so the judge work (step 4) can run
     (OLMo-3.1-32B via vLLM on an 80 GB GPU).
   - The Claude CLI backend was verified with one real call. The `codex` and `agy` CLIs (and WSL) **aren't installed**
     on the laptop, so the pilot starts with OLMo + Claude.
-- **Next:** run the judge notebook in pilot mode (500 Quora queries ≈ 2.7k pairs) → `judge --backend claude --model
-  claude-opus-5-5` on the same pairs (laptop) → `report`. Then decide the bulk judge (~144k pairs).
+- **Step 4, judge pilot: ✅ done.** Results are in `docs/data-card.md`.
+  - The `codex` and `agy` CLIs are now installed. agy 1.3.0 runs headless on Windows.
+  - OLMo-3.1-32B agrees poorly with the frontier judges (kappa 0.15 vs Claude), while Claude and Codex agree well
+    (kappa 0.65).
+  - The agreed false-negative rate is only 1.2% of band pairs (28/366 queries). Embedding scores can't separate them.
+  - At about 3.7 prompts/min, frontier judging of Quora's ~45k queries would take ~200 h per judge.
+- **Proposed (awaiting Pete):**
+  - **Skip bulk LLM judging for Track B v1** (the plan's own "tiny false-negative rate" rule) and **drop B5**.
+  - Go straight to **B1–B4** on `rescored.parquet`.
+  - Keep OLMo for the synthetic-data pilot (as a generator, not a judge).
+  - If B-runs show SciFact or NFCorpus lagging, run Claude and Codex on just those ~3.4k queries.
 
 ### State at pause (2026-10-05, ~09:03 local)
 
