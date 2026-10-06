@@ -1,7 +1,7 @@
 # Phase 3: training data (Track B first)
 
-**Status: APPROVED 2026-10-05 (decisions at the end). In progress: steps 1, 2, 3 and 5 done; step 4 (judge) built, pilot next.
-See [Progress and resume notes](#progress-and-resume-notes).**
+**Status: Track B ✅ done 2026-10-06; the gate to Phase 4 passed. Results: `docs/phase3-results.md`. Track A and the
+synthetic pilot (§7) remain. Details in [Progress and resume notes](#progress-and-resume-notes).**
 
 ## Goal
 Replace Phase 2's 16k MS MARCO rows with a decontaminated, multi-task **Track B** mix (BEIR train splits, as E5-Mistral,

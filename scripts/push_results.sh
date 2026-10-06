@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Append results/ (+ run logs) to the colab-results branch WITHOUT touching the working branch or index.
-# Safe to call after every run: the branch accumulates (old files kept, new/changed files added).
+# Safe to call after every run: the branch accumulates (old files kept, new/changed files added; --ignore-removal
+# matters: a fresh runtime has only its own results/, and plain `git add` would stage every other file as deleted).
 #   scripts/push_results.sh "message" [--dry-run]
 # Run logs: for every runs/<name>/ with embed_config.json, copies config.yaml, embed_config.json, log.jsonl into
 # results/run_logs/<name>/ (adapters stay on Drive; they're too big for git).
@@ -18,7 +19,7 @@ done
 git fetch -q origin "$branch" 2>/dev/null && parent=$(git rev-parse "origin/$branch") || parent=$(git rev-parse HEAD)
 export GIT_INDEX_FILE=$(mktemp -u)
 git read-tree "$parent"
-git add -f results
+git add -f --ignore-removal results  # never stage deletions: a runtime only has its own results/, not the branch's
 tree=$(git write-tree)
 rm -f "$GIT_INDEX_FILE"; unset GIT_INDEX_FILE
 if [ "$tree" = "$(git rev-parse "$parent^{tree}")" ]; then echo "nothing new to push"; exit 0; fi
