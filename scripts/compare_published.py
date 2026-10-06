@@ -12,6 +12,8 @@ import json
 import os
 
 PUBLISHED = os.path.expanduser("~/.cache/mteb/remote/results")
+IN_DOMAIN = {f"Nano{t}Retrieval" for t in ("MSMARCO", "NQ", "HotpotQA", "FEVER", "FiQA2018", "SciFact", "NFCorpus", "Quora")}
+HELD_OUT = {f"Nano{t}Retrieval" for t in ("ArguAna", "ClimateFever", "DBPedia", "SCIDOCS", "Touche2020")}
 
 
 def ndcg(path):
@@ -67,6 +69,11 @@ def main():
             no_ms = [v for (m, t), v in ours.items() if m == model and t.startswith("Nano") and "MSMARCO" not in t]
             if len(no_ms) == len(nano) - 1:
                 print(f"  {'NanoBEIR avg-12 (no MSMARCO)':<28}{sum(no_ms) / len(no_ms):8.2f}")
+            # Phase 3 (Track B trains on 8 of the 13 tasks): in-domain vs held-out averages (docs/phase3-plan.md §6)
+            for label, group in (("avg-in-8", IN_DOMAIN), ("avg-OOD-5", HELD_OUT)):
+                vals = [v for (m, t), v in ours.items() if m == model and t in group]
+                if len(vals) == len(group):
+                    print(f"  {'NanoBEIR ' + label:<28}{sum(vals) / len(vals):8.2f}")
     print(f"\n{'PASS' if not fails else f'{fails} task(s) outside ±{args.tol}'}")
 
 

@@ -135,15 +135,23 @@ ClimateFEVER is only partly held out because FEVER is related, so it's also repo
 | B1 | Track B v1, 16k rows | 125 | Mix vs MS MARCO-only, same compute | 26 min |
 | B2 | B1 + `per_task` instructions | 125 | Do instructions help once they match eval? | 26 min |
 | B3 | Track B v1, 64k rows | 500 | Does more data keep paying on the proxy? | ~1.5 h |
-| B4 | B1 with `rlhn/default` (uncleaned) | 125 | Is RLHN's relabeling worth it for us? | 26 min |
-| B5 | B1 without the §4b LLM judging (embedder guard only) | 125 | Is the judge cascade worth it on Quora, SciFact and NFCorpus? | 26 min |
+| B4 | B1 rows with their **upstream** negatives (no Qwen3 rescore or guard) | 125 | Was the rescore + guard worth it? | 26 min |
+| ~~B5~~ | *dropped 2026-10-06*: the judge pilot found 1.2% false negatives, so bulk judging was skipped (§ progress notes) | | | |
 
-Total is about 3.5 h ≈ 20 CU ≈ $2. Same single-seed caveats as Phase 2.
+**Changed 2026-10-06 (Pete approved):**
+- **B4 originally compared RLHN's cleaned data against `rlhn/default`.** That needed a second ~3.5 h rescore, and the
+  RLHN paper already measures the effect (+2–3 BEIR).
+- **It now isolates our own rescore + guard instead,** using `src/olmo3_embed/data/upstream_negs.py`.
+- **SciFact and NFCorpus have no upstream negatives,** so they keep the mined list in both runs.
+
+All runs use `configs/trackb-base.yaml` (a8 recipe: EOS pooling, no instructions; plus one task per batch, T=0.5,
+k=3 from the 10 hardest negatives, false-negative masking) via `notebooks/phase3_bruns_colab.ipynb`. Total is about
+2.5 h on an A100 ≈ 15–17 units. Same single-seed caveats as Phase 2.
 
 **Gate to Phase 4:**
 - Data card written, with zero BEIR test-query overlap verified.
-- The best Track B run beats a8 on avg-13.
-- No regression on avg-OOD-5 vs a8 (a8's avg-OOD-5 gets recomputed from its existing results).
+- The best Track B run beats a8 on avg-13 (**57.48**).
+- No regression on avg-OOD-5 vs a8 (**46.02**). a8's avg-in-8 is 64.64, for reference.
 
 ## 7. Later in Phase 3 (after the gate)
 - **Track A (zero-shot-clean):** drop every BEIR-derived source. Use non-BEIR pairs (StackExchange, S2ORC, PAQ, ELI5,

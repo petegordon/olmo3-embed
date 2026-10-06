@@ -101,3 +101,16 @@ def test_query_text_modes():
     assert "web search query" in query_text(r, Config())  # fixed (Phase 2 default)
     per = query_text(r, Config(instruction_mode="per_task"))
     assert per.startswith("Instruct: Given a question, retrieve Wikipedia passages") and per.endswith("who wrote hamlet")
+
+
+def test_upstream_negs_variant(tmp_path):
+    import subprocess, sys
+    r = pd.DataFrame({"qid": ["MSMARCO:1", "SciFact:2"], "task": ["MSMARCO", "SciFact"], "query": ["q1", "q2"],
+                      "positives": [["p1"], ["p2"]], "negatives": [["rescored1"], ["mined2a", "mined2b"]]})
+    d = pd.DataFrame({"qid": ["MSMARCO:1", "SciFact:2"], "negatives": [[f"up{i}" for i in range(40)], []]})
+    r.to_parquet(tmp_path / "r.parquet"), d.to_parquet(tmp_path / "d.parquet")
+    subprocess.run([sys.executable, "-m", "olmo3_embed.data.upstream_negs", "--rescored", str(tmp_path / "r.parquet"),
+                    "--decontam", str(tmp_path / "d.parquet"), "--out", str(tmp_path / "o.parquet")], check=True)
+    o = pd.read_parquet(tmp_path / "o.parquet").set_index("qid")
+    assert list(o.at["MSMARCO:1", "negatives"]) == [f"up{i}" for i in range(30)]  # upstream, capped, source order
+    assert list(o.at["SciFact:2", "negatives"]) == ["mined2a", "mined2b"]  # no upstream: mined list kept

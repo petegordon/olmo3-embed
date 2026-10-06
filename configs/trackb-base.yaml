@@ -1,0 +1,24 @@
+# Phase 3 B1 (docs/phase3-plan.md §6): the Phase 2 a8 recipe on Track B v1. B2-B4 = this file + one --set override.
+run_name: p3-b1-trackb
+model: allenai/OLMo-2-0425-1B
+data: data/trackb_v1/rescored.parquet
+n_examples: 16000          # same compute as Phase 2 (125 steps at batch 128)
+pooling: last              # a8: EOS last-token pooling ...
+bidirectional: false
+instructions: false        # ... and no instructions
+instruction_mode: per_task # used only when instructions=true (B2)
+task_batching: true        # one task per batch
+task_temperature: 0.5      # rows per task ∝ n ** 0.5
+neg_pool: 10               # sample k from the 10 hardest rescored (guarded) negatives
+mask_false_negatives: true
+max_len_query: 64
+max_len_doc: 256
+num_negatives: 3
+temperature: 0.02
+batch_size: 128
+chunk_size: 32
+lora_r: 16
+lora_alpha: 32
+lr: 1.0e-4
+warmup_ratio: 0.05
+seed: 0
