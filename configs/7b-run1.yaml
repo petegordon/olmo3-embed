@@ -1,0 +1,26 @@
+# Phase 4 run #1 (docs/phase4-plan.md): OLMo-3-7B on Phase 3 B3's exact recipe and data budget (64k rows),
+# so the comparison with the 1B proxy's B3 (62.28 NanoBEIR avg-13) isolates model scale.
+# GPU memory knobs (gradient_checkpointing, chunk_size) are set per runtime by the notebook's timing cell.
+run_name: p4-run1-7b
+model: allenai/Olmo-3-1025-7B
+data: data/trackb_v1/rescored.parquet
+n_examples: 64000
+pooling: last
+bidirectional: false
+instructions: false
+instruction_mode: per_task
+task_batching: true
+task_temperature: 0.5
+neg_pool: 10
+mask_false_negatives: true
+max_len_query: 64
+max_len_doc: 256
+num_negatives: 3
+temperature: 0.02
+batch_size: 128
+lora_r: 16
+lora_alpha: 32
+lr: 1.0e-4
+warmup_ratio: 0.05
+seed: 0
+save_every: 10           # ~15-20 min of 7B steps: a Colab disconnect loses at most that
