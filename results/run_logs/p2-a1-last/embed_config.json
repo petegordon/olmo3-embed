@@ -1,9 +1,0 @@
-{
-  "model": "allenai/OLMo-2-0425-1B",
-  "run_name": "p2-a1-last",
-  "pooling": "last",
-  "bidirectional": false,
-  "instructions": true,
-  "dtype": "bfloat16",
-  "steps": 125
-}
