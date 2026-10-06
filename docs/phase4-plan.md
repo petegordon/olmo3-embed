@@ -1,6 +1,23 @@
 # Phase 4: first OLMo-3-7B run (plan)
 
-**Status: DRAFT, awaiting Pete's review (2026-10-06). Nothing run yet.**
+**Status: APPROVED 2026-10-06 (Pete: run #1 at 64k rows on Colab Pro; use the credits). Run #1 started 2026-10-06
+on an A100 80GB.**
+
+## Measured cost (step 0, 2026-10-06) — replaces the estimates below
+Timing cell, A100-SXM4-80GB (High-RAM, 6.77 units/h), 4 steps per memory setting:
+
+| Setting | s/step | Peak memory |
+|---|---:|---:|
+| **No gradient checkpointing, chunk 8** (picked) | **38.0** | 32.4 GB |
+| Gradient checkpointing, chunk 16 | 45.6 | 16.0 GB |
+
+- **In the run:** about 44 s/step on average, since MS MARCO and HotpotQA batches have longer passages than the
+  timing sample.
+- **Run #1 (496 steps):** about 6.2 h ≈ **42 units**, half the estimate below. My estimate scaled the proxy's s/step
+  by FLOPs and missed the A100 being much better used at 7B.
+- **A full-data epoch** (~2,900 steps): about 35 h ≈ **240 units**. That fits the remaining balance without top-ups.
+  At ~5 h per Colab session, that's about 7 sessions.
+- **LoRA:** 39.98M trainable parameters (0.58% of 6.93B).
 
 ## Goal and gate (PLAN.md §6)
 Train `allenai/Olmo-3-1025-7B` into an embedder with the Phase 2–3 recipe, then check it against the Phase 4 gate:
@@ -30,7 +47,7 @@ the 7B.
   `OlmoEmbedder`, so loading and eval are proven.
 - **Untested at 7B: LoRA + GradCache training.** Step 0 covers it.
 
-## Cost model (to be replaced by measurements in step 0)
+## Cost model (pre-measurement estimates; see "Measured cost" above)
 - **Per token,** the 7B costs about 6.4× the proxy (≈6.9B vs ≈1.07B non-embedding params).
 - **Proxy speed on Track B:** 13.4 s/step on an A100 40GB without gradient checkpointing.
 
