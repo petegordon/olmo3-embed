@@ -1,6 +1,6 @@
 # Phase 3: training data (Track B first)
 
-**Status: APPROVED 2026-10-05 (decisions at the end). In progress: steps 1–2 done, step 3 built and paused.
+**Status: APPROVED 2026-10-05 (decisions at the end). In progress: steps 1, 2, 3 and 5 done; step 4 (judge) built, pilot next.
 See [Progress and resume notes](#progress-and-resume-notes).**
 
 ## Goal
@@ -168,6 +168,25 @@ Total is about 3.5 h ≈ 20 CU ≈ $2. Same single-seed caveats as Phase 2.
 Steps 1–3 and 5 don't depend on the judges, so the judge work (step 4) can run in parallel.
 
 ## Progress and resume notes
+
+### Update 2026-10-06
+- **Step 3, rescore: ✅ done.**
+  - Ran on a Colab A100 80GB with no H100 offered. The document embedding took 3 h 05 min (306→449 docs/s;
+    longest passages first, so it sped up as it went). About 3.5 h of runtime in total, ≈ 24 units.
+  - Output: `MyDrive/olmo3-embed/data/trackb_v1/rescored.parquet` (2.5 GB). The stats are on `colab-results`
+    (`fd63e72`), and the per-task table is in `docs/data-card.md`.
+  - The runtime was deleted afterwards.
+- **Step 5, `train.py`: ✅ done** (`3b00129`).
+  - Adds task-homogeneous temperature batching, `instruction_mode: per_task` (MTEB prompts, matching eval),
+    in-batch false-negative masking and `neg_pool`.
+  - Phase 2 batches are unchanged (tested).
+- **Step 4, judge: built** (`08d2e99`).
+  - `src/olmo3_embed/data/judge/` (`select` / `judge` / `report`) and `notebooks/phase3_judge_colab.ipynb`
+    (OLMo-3.1-32B via vLLM on an 80 GB GPU).
+  - The Claude CLI backend was verified with one real call. The `codex` and `agy` CLIs (and WSL) **aren't installed**
+    on the laptop, so the pilot starts with OLMo + Claude.
+- **Next:** run the judge notebook in pilot mode (500 Quora queries ≈ 2.7k pairs) → `judge --backend claude --model
+  claude-opus-5-5` on the same pairs (laptop) → `report`. Then decide the bulk judge (~144k pairs).
 
 ### State at pause (2026-10-05, ~09:03 local)
 

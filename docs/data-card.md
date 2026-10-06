@@ -69,9 +69,40 @@ different query* is how every Track B model (E5, NV-Embed, bge-en-icl, Qwen3) tr
 on the held-out avg-OOD-5 (ArguAna, ClimateFEVER, DBPedia, SCIDOCS, Touche2020; plan §6). FEVER → ClimateFEVER (1,438
 rows) is why ClimateFEVER counts as only partly held out. **Track A will drop all of these rows.**
 
+## Hard-negative rescoring (2026-10-06)
+`python -m olmo3_embed.data.rescore` on a Colab A100 80GB (`notebooks/phase3_rescore_colab.ipynb`).
+- **Teacher:** Qwen/Qwen3-Embedding-0.6B, bf16, cosine similarity. Queries use Qwen3's instruction format with each
+  task's MTEB instruction; documents get no instruction.
+- **Candidates:** the upstream negatives, capped at 30 per row in source rank order.
+- **SciFact and NFCorpus:** mined from the full corpus (top 100, ranks 10–39 kept).
+- **Scale:** 4,863,468 unique passages and 373,762 queries, embedded in 3 h 05 min.
+- **Guard:** drop a candidate scoring above 95% of the best positive's score (NV-Retriever's TopK-PercPos).
+  Survivors are stored hardest-first with their scores.
+
+| Task | Rows | Candidates/row | Guarded (dropped) | Judge band/row (80–95% of positive) | Rows with <3 negatives left | Mean positive score |
+|---|---:|---:|---:|---:|---:|---:|
+| MS MARCO | 149,949 | 23.1 | 8.0% | 5.45 | 443 | 0.73 |
+| HotpotQA | 84,387 | 19.9 | 1.7% | 1.34 | 113 | 0.69 |
+| NQ | 57,520 | 30.0 | 12.7% | 8.67 | 750 | 0.68 |
+| Quora | 44,702 | 29.2 | 1.6% | 5.33 | 4 | 0.85 |
+| FEVER | 28,325 | 19.8 | 0.2% | 0.36 | 3 | 0.78 |
+| FiQA-2018 | 5,495 | 14.3 | 13.6% | 3.17 | 167 | 0.64 |
+| NFCorpus | 2,582 | 29.9 | 27.4% | 7.61 | 603 | 0.53 |
+| SciFact | 802 | 30.0 | 15.0% | 7.13 | 97 | 0.66 |
+
+- **The guard barely touches RLHN's LLM-cleaned sets** (FEVER 0.2%, HotpotQA 1.7%, which matches upstream cleaning).
+  It bites hardest where nobody has cleaned the data or where relevance is graded and broad: NFCorpus 27%, SciFact
+  15%, FiQA 14%, NQ 13%.
+- **NFCorpus is the weak spot:**
+  - 603 of 2,582 rows keep fewer than 3 negatives, so k=3 training skips them.
+  - Its mean positive score (0.53) is the lowest, because the highest-relevance grade covers many loosely related
+    documents.
+- **Judge band size**, with top 3 per query: about 134k Quora, 7.7k NFCorpus and 2.4k SciFact pairs, so **~144k
+  pairs** for the §4b cascade. That's below the plan's ~190k estimate.
+- **Output:** `MyDrive/olmo3-embed/data/trackb_v1/rescored.parquet` (2.5 GB). The stats are on `colab-results` in
+  `results/data/trackb_v1/rescored_stats.json`.
+
 ## Still to add
-- Hard-negative rescoring with the Qwen3-Embedding-0.6B embedder (95%-of-positive guard), and mining for SciFact and
-  NFCorpus.
 - LLM judge pass on Quora, SciFact and NFCorpus: OLMo-3.1-32B-Instruct for the bulk, Claude to verify, Codex and Gemini
   to break ties. Per-judge agreement goes here.
 - Final per-task row counts and the sampling temperature used in training.
