@@ -1,6 +1,7 @@
 # Phase 4: first OLMo-3-7B run (plan)
 
-**Status: APPROVED 2026-10-06 (Pete: run #1 at 64k rows on Colab Pro; use the credits). Run #1 started 2026-10-06
+**Status: run #1 DONE 2026-10-07: NanoBEIR 65.93; gate A ✗ (Qwen3-4B 69.97); gate B (full BEIR) not yet run. Results:
+`docs/phase4-results.md`. (Approved 2026-10-06: run #1 at 64k rows on Colab Pro.) Started 2026-10-06
 on an A100 80GB.**
 
 ## Measured cost (step 0, 2026-10-06) — replaces the estimates below
