@@ -1,6 +1,6 @@
 # Task-variety data (Track B+): close the held-out gap (plan)
 
-**Status: DRAFT, awaiting Pete's review (2026-10-07). Nothing built yet.**
+**Status: APPROVED 2026-10-07 (decisions at the end). In progress: source vetting + document-level decontamination.**
 
 ## Why
 Run #1 (OLMo-3-7B on Track B v1, `docs/phase4-results.md`):
@@ -94,13 +94,10 @@ compute (64k rows, 496 steps) and adds new tasks to the temperature mix, so any 
 
 That fits the ~255 units left, and keeps room for an eval of run #2.
 
-## Decisions for Pete
-1. **Approve this direction:** task-variety data proven on the proxy first, then 7B run #2.
-2. **Generators:** OLMo-3.1-32B for bulk (fully open, fast), plus Claude/Codex for a smaller, diverse slice.
-   *Recommend.* Gemini is optional given how strict it judged; generation is a different job, so the pilot can include
-   it cheaply.
-3. **Argument text source:** Hansard (clear license, real debate) and Wikipedia controversy sections are the
-   candidates. Kialo and Reddit ChangeMyView are richer, but their reuse terms are unclear, so *recommend excluding
-   them*.
-4. **Whether to also run BEIR-15 lite on run #1 now** (measured: ~7–9 h, ~50–60 units; see `docs/phase4-results.md`), or wait and evaluate
-   only run #2.
+## Decisions (Pete, 2026-10-07)
+1. **Direction approved:** task-variety data proven on the 1B proxy first, then 7B run #2.
+2. **Generators:** OLMo-3.1-32B on Colab for bulk, plus **Claude, Codex and Gemini (Antigravity)** for diverse
+   slices. All four are in the synthetic pilot, and per-row provenance lets the proxy decide the mix.
+3. **Argument text:** Hansard and Wikipedia controversy sections. Kialo and Reddit ChangeMyView are excluded (unclear
+   reuse terms).
+4. **BEIR-15 lite on run #1: skipped** (~50–60 units). Evaluate run #2 instead.
