@@ -102,5 +102,5 @@ That fits the ~255 units left, and keeps room for an eval of run #2.
 3. **Argument text source:** Hansard (clear license, real debate) and Wikipedia controversy sections are the
    candidates. Kialo and Reddit ChangeMyView are richer, but their reuse terms are unclear, so *recommend excluding
    them*.
-4. **Whether to also run BEIR-15 lite on run #1 now,** priced by the eval speed test in progress, or wait and evaluate
+4. **Whether to also run BEIR-15 lite on run #1 now** (measured: ~7–9 h, ~50–60 units; see `docs/phase4-results.md`), or wait and evaluate
    only run #2.

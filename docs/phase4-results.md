@@ -62,7 +62,18 @@ Qwen3-0.6B's Touche (61.88) comes from `docs/phase1-baselines.md`.
      ~60 h and ~400 units, which isn't feasible on Colab credits. My earlier "~4 h, ~25 units" was wrong.
    - **Feasible instead: "BEIR-15 lite."** MTEB's official HardNegatives versions of the 7 large tasks (ClimateFEVER,
      DBPedia, FEVER, HotpotQA, NQ, MS MARCO, Quora; same queries and labels, corpus cut to the top ~250 candidates
-     per query) plus the 8 small tasks in full. That's ~2.0M passages, ~4–6 h, ~30–40 units after a speed test.
+     per query) plus the 8 small tasks in full. That's ~2.0M passages, ~290M tokens.
+   - **Measured speed test, 2026-10-07** (`scripts/eval_speed.py`, run #1 merged, A100 80GB, max 512 tokens):
+
+     | Passages | Mean tokens | Batch 16 | Batch 64 | Batch 128 |
+     |---|---:|---:|---:|---:|
+     | HotpotQA HardNegatives (Wikipedia) | 98 | 89.9/s (18 GB) | 89.5/s (32 GB) | 86.3/s (50 GB) |
+     | Touche-2020 (long arguments) | 246 | 44.3/s | (not run) | (not run) |
+
+     - **Compute-bound:** bigger batches don't help. Throughput is about **9–11k tokens/s**, so time scales with total
+       tokens.
+     - **BEIR-15 lite ≈ 7–9 h ≈ 50–60 units.** Full BEIR (~3.4B tokens) ≈ 86–106 h ≈ 580–720 units.
+     - My unmeasured "2–3× from bigger batches" doesn't exist; the estimates above replace it.
    - **Comparable** with published scores for the same task versions (Qwen3, E5-Mistral, LLM2Vec), but **not** the
      exact full-BEIR number for the T1 target (56.6). That needs the full corpora, reserved for a final model.
 2. **Task diversity: Track A / synthetic data aimed at the held-out task types** (PLAN §4.4, `docs/phase3-plan.md` §7).
