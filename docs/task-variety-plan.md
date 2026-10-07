@@ -129,3 +129,37 @@ That fits the ~255 units left, and keeps room for an eval of run #2.
 3. **Argument text:** Hansard and Wikipedia controversy sections. Kialo and Reddit ChangeMyView are excluded (unclear
    reuse terms).
 4. **BEIR-15 lite on run #1: skipped** (~50–60 units). Evaluate run #2 instead.
+
+## Results
+
+### V1: public pairs (p5-v1, 2026-10-07)
+B3 recipe and 64k-row budget, with V1's 138,962 rows (StackExchange 78,978 and S2ORCCitation 59,984, after
+decontamination) added to the temperature mix. Data: release asset `data-variety-v1`. Negatives mined from each task's
+own pool. Cost: about 2 h on A100 40GB (~10 units, including mining 138k docs).
+
+| Task | B3 | p5-v1 | Δ |
+|---|---|---|---|
+| ArguAna | 53.93 | 56.25 | +2.32 |
+| ClimateFEVER | 38.70 | 39.03 | +0.33 |
+| DBPedia | 60.41 | 61.50 | +1.09 |
+| SCIDOCS | 39.59 | 41.04 | +1.45 |
+| Touche2020 | 54.12 | 52.00 | −2.12 |
+| **avg-OOD-5** | **49.35** | **49.96** | **+0.61** |
+| FEVER | 90.59 | 90.75 | +0.16 |
+| FiQA2018 | 57.12 | 56.50 | −0.62 |
+| HotpotQA | 84.69 | 83.30 | −1.39 |
+| MSMARCO | 55.13 | 53.88 | −1.25 |
+| NFCorpus | 35.91 | 35.01 | −0.90 |
+| NQ | 65.09 | 66.02 | +0.93 |
+| Quora | 95.66 | 94.87 | −0.79 |
+| SciFact | 78.70 | 75.99 | −2.71 |
+| **avg-in-8** | **70.36** | **69.54** | **−0.82** |
+| avg-13 | 62.28 | 62.01 | −0.27 |
+
+**Below the keep bar** (OOD +0.61 vs the +1 threshold; in-domain −0.82). Per-task differences of about 1–2 points are
+within Nano noise (~50 queries per task). The SCIDOCS gain from S2ORC citations is the expected direction.
+StackExchange added almost no training signal: its batches sat at loss ≈0.005, accuracy 1.0. Own-pool negatives come
+from other forums, so they are trivially easy. That budget came out of the in-domain tasks.
+
+**Next:** carry only S2ORCCitation into V4. Drop StackExchange unless its negatives are mined within the same site, and
+then only if it earns its place in a combined run.
