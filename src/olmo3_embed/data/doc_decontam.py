@@ -126,9 +126,19 @@ def build() -> DocIndex:
     return idx
 
 
+class _Unpickler(pickle.Unpickler):
+    """An index built by `python -m ...doc_decontam --build` pickles its class as __main__.DocIndex; resolve it here so
+    other modules (synth.py pool) can load it too."""
+
+    def find_class(self, module, name):
+        if name == "DocIndex":
+            return DocIndex
+        return super().find_class(module, name)
+
+
 def load() -> DocIndex:
     with open(INDEX, "rb") as f:
-        return pickle.load(f)
+        return _Unpickler(f).load()
 
 
 def main():

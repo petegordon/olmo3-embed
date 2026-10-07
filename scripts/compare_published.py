@@ -14,6 +14,7 @@ import os
 PUBLISHED = os.path.expanduser("~/.cache/mteb/remote/results")
 IN_DOMAIN = {f"Nano{t}Retrieval" for t in ("MSMARCO", "NQ", "HotpotQA", "FEVER", "FiQA2018", "SciFact", "NFCorpus", "Quora")}
 HELD_OUT = {f"Nano{t}Retrieval" for t in ("ArguAna", "ClimateFever", "DBPedia", "SCIDOCS", "Touche2020")}
+HELD_OUT_FULL = {"ArguAna", "SCIDOCS", "ClimateFEVERHardNegatives", "DBPediaHardNegatives"}  # eval --suite heldout
 
 
 def ndcg(path):
@@ -74,6 +75,9 @@ def main():
                 vals = [v for (m, t), v in ours.items() if m == model and t in group]
                 if len(vals) == len(group):
                     print(f"  {'NanoBEIR ' + label:<28}{sum(vals) / len(vals):8.2f}")
+        full = [v for (m, t), v in ours.items() if m == model and t in HELD_OUT_FULL]
+        if len(full) == len(HELD_OUT_FULL):
+            print(f"  {'heldout-4 (full size)':<28}{sum(full) / len(full):8.2f}")
     print(f"\n{'PASS' if not fails else f'{fails} task(s) outside ±{args.tol}'}")
 
 

@@ -101,7 +101,8 @@ def read_jsonl(path):
         return [json.loads(line) for line in f if line.strip()]
 
 
-def mine(df: pd.DataFrame, model, batch_size: int, top: int = 100, lo: int = 10) -> pd.DataFrame:
+def mine(df: pd.DataFrame, model, batch_size: int, top: int = 100, lo: int = 10,
+         pool: dict[str, list[str]] | None = None) -> pd.DataFrame:
     for task, d in MINE.items():
         rows = df.index[df.task == task]
         if len(rows) == 0:
@@ -116,12 +117,13 @@ def mine(df: pd.DataFrame, model, batch_size: int, top: int = 100, lo: int = 10)
             df.at[r, "negatives"] = [corpus[j] for j in ids[lo - 1 :] if corpus[j] not in pos]
         print(f"  mined {task}: {len(rows)} queries over {len(corpus)} docs, ranks {lo}-{top}", flush=True)
     # Tasks with no upstream negatives and no corpus file (task-variety sources: StackExchange, S2ORC citations,
-    # synthetic): mine from the task's own pool of positives, i.e. other rows' documents of the same kind.
+    # synthetic): mine from the task's own pool of positives, i.e. other rows' documents of the same kind, plus the
+    # task's --pool documents if given (a large same-domain corpus: own pools of a few thousand are too easy).
     for task in sorted(set(df.task) - set(MINE)):
         rows = df.index[df.task == task]
         if any(len(n) for n in df.loc[rows, "negatives"]):
             continue
-        corpus = list(dict.fromkeys(p for P in df.loc[rows, "positives"] for p in P if p))
+        corpus = list(dict.fromkeys([p for P in df.loc[rows, "positives"] for p in P if p] + (pool or {}).get(task, [])))
         ce = torch.from_numpy(encode(model, corpus, batch_size)).cuda()
         qs = [qtext(task, q) for q in df.loc[rows, "query"]]
         for s in range(0, len(rows), 4096):  # chunked: a 60k x 60k score matrix wouldn't fit
@@ -130,7 +132,8 @@ def mine(df: pd.DataFrame, model, batch_size: int, top: int = 100, lo: int = 10)
             for r, ids in zip(rows[s : s + 4096], top_idx):
                 pos = set(df.at[r, "positives"])
                 df.at[r, "negatives"] = [corpus[j] for j in ids[lo - 1 :] if corpus[j] not in pos]
-        print(f"  mined {task} (own pool): {len(rows)} queries over {len(corpus)} docs, ranks {lo}-{top}", flush=True)
+        print(f"  mined {task} (own pool{' + --pool' if task in (pool or {}) else ''}): {len(rows)} queries over "
+              f"{len(corpus)} docs, ranks {lo}-{top}", flush=True)
     return df
 
 
@@ -147,6 +150,8 @@ def main():
     ap.add_argument("--shard", type=int, default=200_000)
     ap.add_argument("--limit", type=int, default=0, help="first N rows only (smoke test)")
     ap.add_argument("--bench", type=int, default=0)
+    ap.add_argument("--pool", nargs="*", default=[],
+                    help="parquet(s) with task, text: extra mining corpus for own-pool tasks (synth.py pool)")
     args = ap.parse_args()
     out_dir = args.out or args.data
     os.makedirs(args.work, exist_ok=True)
@@ -173,7 +178,11 @@ def main():
               f"{total:,} texts; peak mem {torch.cuda.max_memory_allocated() / 1e9:.1f} GB", flush=True)
         return
 
-    df = mine(df, model, args.batch_size)
+    pool = {}
+    for p in args.pool:
+        for task, d in pd.read_parquet(p).groupby("task"):
+            pool.setdefault(task, []).extend(d.text.tolist())
+    df = mine(df, model, args.batch_size, pool=pool)
     df["negatives"] = df.negatives.map(lambda n: n[: args.max_cands])  # mined lists are rank-ordered: ranks 10-39
     docs = list(dict.fromkeys(d for col in ("positives", "negatives") for L in df[col] for d in L))
     doc_id = {d: i for i, d in enumerate(docs)}

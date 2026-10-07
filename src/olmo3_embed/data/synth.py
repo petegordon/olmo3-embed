@@ -4,6 +4,8 @@
   generate  python -m olmo3_embed.data.synth generate --passages data/synth/passages_argument.jsonl --backend claude \
                 [--model M] [--part 0 --parts 4] --out data/synth/argument_claude.jsonl
   collect   python -m olmo3_embed.data.synth collect data/synth/*_*.jsonl --out data/variety_synth/ingested.parquet
+  pool      python -m olmo3_embed.data.synth pool --shape entity --n 500000 --exclude data/synth/passages_entity.jsonl \
+                --out data/variety_v3/pool_entity.parquet      (negative-mining pool for rescore.py --pool)
 
 Real passages from vetted, non-test sources (license on each source's card); an LLM writes the query in the target
 task's shape. Hard negatives are NOT generated: rescore.py mines them from each task's own pool of positives.
@@ -17,6 +19,7 @@ import json
 import os
 import random
 import re
+import warnings
 
 from datasets import load_dataset
 
@@ -181,6 +184,57 @@ def cmd_generate(a):
             print(f"  {min(s + a.chunk, len(groups))}/{len(groups)} prompts", flush=True)
 
 
+POOL_TASK = {"entity": "SynthEntitySearch", "claim": "SynthClimateClaim"}
+
+
+def cmd_pool(a):
+    """Negative-mining pool for a Wikipedia shape (rescore.py --pool): own-pool negatives from a few thousand sampled
+    passages are trivially easy (V3: batches at ~95-100% accuracy), while DBPedia/ClimateFEVER retrieve from millions of
+    Wikipedia docs. entity: random article leads ("title lead", as sampled). claim: paragraphs that mention climate
+    terms, from any article. Articles in the passage sample are excluded (their other paragraphs may be relevant), and
+    the pool is decontaminated against test documents (doc_decontam index) like positives."""
+    import pandas as pd
+    import pyarrow.parquet as pq
+    from olmo3_embed.data import doc_decontam
+
+    skip = {str(r["meta"]["wiki_id"]) for r in read_jsonl(a.exclude)}
+    files = sorted(glob.glob(os.path.join(os.environ.get("OLMO3_RAW", "data/raw"), "wikipedia", "20231101.en", "*.parquet")))
+    random.Random(a.seed).shuffle(files)
+    out = []
+    for fpath in files:
+        for b in pq.ParquetFile(fpath).iter_batches(columns=["id", "title", "text"], batch_size=50_000):
+            df = b.to_pandas()
+            df = df[~df["id"].astype(str).isin(skip)]
+            # drop the full text before exploding, or every paragraph row carries a copy of its article (OOM)
+            paras = df[["id", "title"]].assign(p=df["text"].str.split("\n")).explode("p").dropna(subset=["p"])
+            paras["p"] = paras["p"].map(lambda t: " ".join(str(t).split()))
+            paras = paras[paras["p"].str.len().between(200, 1500)]
+            if a.shape == "entity":  # lead = first paragraph of >= 200 chars, as in sample_wikipedia
+                paras = paras.groupby("id", sort=False).head(1)
+                paras = paras[paras["p"].str.len() <= 1500]
+            else:
+                with warnings.catch_warnings():  # CLIMATE has match groups; contains() only needs the boolean
+                    warnings.simplefilter("ignore", UserWarning)
+                    paras = paras[paras["p"].str.contains(CLIMATE)]
+            out += (paras["title"] + " " + paras["p"]).tolist()
+        print(f"  {os.path.basename(fpath)}: {len(out):,} candidates", flush=True)
+        if len(out) >= a.n * 1.2:
+            break
+    rng = random.Random(a.seed)
+    rng.shuffle(out)
+    idx = doc_decontam.load()
+    keep, hits = [], 0
+    for t in out:
+        if len(keep) >= a.n:
+            break
+        if idx.check(t):
+            hits += 1
+        else:
+            keep.append(t)
+    pd.DataFrame({"task": POOL_TASK[a.shape], "text": keep}).to_parquet(a.out, index=False, row_group_size=20_000)
+    print(f"{len(keep):,} {a.shape} pool docs ({hits} dropped by doc decontam) -> {a.out}")
+
+
 def cmd_collect(a):
     import pandas as pd
     rows = []
@@ -216,8 +270,14 @@ def main():
     c = sub.add_parser("collect")
     c.add_argument("inputs", nargs="+")
     c.add_argument("--out", required=True)
+    p = sub.add_parser("pool")
+    p.add_argument("--shape", choices=sorted(POOL_TASK), required=True)
+    p.add_argument("--n", type=int, required=True)
+    p.add_argument("--exclude", required=True, help="the shape's passages file: its articles stay out of the pool")
+    p.add_argument("--seed", type=int, default=1)
+    p.add_argument("--out", required=True)
     a = ap.parse_args()
-    {"sample": cmd_sample, "generate": cmd_generate, "collect": cmd_collect}[a.cmd](a)
+    {"sample": cmd_sample, "generate": cmd_generate, "collect": cmd_collect, "pool": cmd_pool}[a.cmd](a)
 
 
 if __name__ == "__main__":
