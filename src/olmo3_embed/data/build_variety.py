@@ -3,7 +3,8 @@
     python -m olmo3_embed.data.build_variety [--per-site 1000] [--s2orc 60000] [--out data/variety_v1]
 
   StackExchange  flax-sentence-embeddings/stackexchange_title_body_jsonl (CC BY-SA 4.0): question title -> title+body.
-                 Every site EXCEPT the 12 CQADupStack test forums; up to --per-site rows per site (seeded sample).
+                 Every site EXCEPT the 12 CQADupStack test forums and money (FiQA-2018's source: decontam found 44
+                 exact FiQA test queries there); up to --per-site rows per site (seeded sample).
   S2ORCCitation  sentence-transformers/s2orc title-citation-pair (ODC-By 1.0): paper title -> title it cites.
                  Pairs where either title is a SCIDOCS corpus title are dropped (SCIDOCS is built from the same S2
                  graph); --s2orc rows sampled from the stream.
@@ -29,6 +30,7 @@ RAW = os.environ.get("OLMO3_RAW", "data/raw")
 SE_REPO = "flax-sentence-embeddings/stackexchange_title_body_jsonl"
 CQADUP_SITES = {"android", "english", "gaming", "gis", "mathematica", "physics", "programmers", "softwareengineering",
                 "stats", "tex", "unix", "webmasters", "wordpress"}  # CQADupStack's 12 test forums (programmers renamed)
+EXCLUDED_SITES = CQADUP_SITES | {"money"}  # money.stackexchange (personal finance) is FiQA-2018's question source
 
 
 def site_of(path: str) -> str:
@@ -42,8 +44,8 @@ def ingest_stackexchange(per_site: int, seed: int, stats: dict, max_scan: int = 
     rows = []
     for f in sorted(files):
         site = site_of(f)
-        if site in CQADUP_SITES:
-            stats["stackexchange"]["excluded_cqadupstack_sites"] += 1
+        if site in EXCLUDED_SITES:
+            stats["stackexchange"]["excluded_test_sites"] += 1
             continue
         ds = load_dataset("json", data_files=f"hf://datasets/{SE_REPO}/{f}", split="train", streaming=True)
         rng, keep, seen = random.Random(f"{seed}:{site}"), [], 0

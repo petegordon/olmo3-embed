@@ -60,15 +60,28 @@ class CLI:
     def text(self, stdout: str) -> str:
         return stdout
 
+    max_consecutive_failures = 5  # then stop: likely auth, quota or an outage, not a one-off
+
     def __call__(self, prompts: list[str]) -> list[str]:
+        """A failed or timed-out call returns "" (its ids stay unjudged/ungenerated and are retried on the next run),
+        so one hung CLI call can't kill a multi-hour job. Several failures in a row still raise."""
         out = []
         for p in prompts:
             argv = [self.path] + self.cmd() + ([p] if self.prompt_arg else [])
-            r = subprocess.run(argv, input=None if self.prompt_arg else p, stdin=subprocess.DEVNULL if self.prompt_arg
-                               else None, capture_output=True, text=True, encoding="utf-8", timeout=self.timeout)
-            if r.returncode != 0:
-                raise RuntimeError(f"{self.exe} exited {r.returncode}: {r.stderr[-500:]}")
-            out.append(self.text(r.stdout))
+            try:
+                r = subprocess.run(argv, input=None if self.prompt_arg else p,
+                                   stdin=subprocess.DEVNULL if self.prompt_arg else None, capture_output=True, text=True,
+                                   encoding="utf-8", timeout=self.timeout)
+                if r.returncode != 0:
+                    raise RuntimeError(f"exited {r.returncode}: {r.stderr[-300:]}")
+                out.append(self.text(r.stdout))
+                self._fails = 0
+            except (subprocess.TimeoutExpired, RuntimeError, json.JSONDecodeError) as e:
+                self._fails = getattr(self, "_fails", 0) + 1
+                print(f"  [{self.exe}] call failed ({self._fails} in a row): {str(e)[:200]}", flush=True)
+                if self._fails >= self.max_consecutive_failures:
+                    raise RuntimeError(f"{self.exe}: {self._fails} consecutive failures, stopping") from e
+                out.append("")
         return out
 
 
@@ -95,12 +108,12 @@ class Gemini(CLI):
     judge with --batch 10. Non-TTY print mode works in agy 1.3.0 (the 1.0.6 hang, issue #318, is gone)."""
     name, exe, prompt_arg = "gemini", "agy", True
 
-    def __init__(self, model: str | None = None, timeout: int = 900):
+    def __init__(self, model: str | None = None, timeout: int = 420):  # agy's own --print-timeout is 5 min
         super().__init__(model, timeout)
         self.model = model or "agy-default"
 
     def cmd(self):
-        return ["--output-format", "json", "--disable-slash-commands"] + (
+        return ["--output-format", "json", "--disable-slash-commands", "--print-timeout", "5m"] + (
             ["--model", self.model] if self.model != "agy-default" else []) + ["-p"]
 
     def text(self, stdout):

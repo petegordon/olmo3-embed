@@ -48,10 +48,10 @@ SHAPES = {
 CLIMATE = re.compile(r"\b(climate|global warming|greenhouse|carbon dioxide|emissions?|sea[- ]level|glacier|ice sheet|"
                      r"ocean acidification|deforestation|drought|el ni[nñ]o|methane|ozone|permafrost|heatwave|wildfire)\b",
                      re.I)
-CLIMATE_TOPIC = re.compile(r"(climate change|global warming|greenhouse gas(es)?|climate science|climate model|"
+CLIMATE_TOPIC = re.compile(r"\b(climate change|global warming|greenhouse gas(es)?|climate science|climate model|"
                            r"carbon emissions?|carbon dioxide emissions?|sea[- ]level rise|ocean acidification|"
                            r"ice sheets?|paleoclimat\w*|climatolog\w*|kyoto protocol|paris agreement|ipcc|"
-                           r"renewable energy|fossil fuels?|carbon capture)", re.I)
+                           r"renewable energy|fossil fuels?|carbon capture)\b", re.I)
 TEMPLATE = """You are creating training data for a search engine.
 
 {instruction}
@@ -107,11 +107,10 @@ def sample_wikipedia(shape: str, seed: int):
             for r in df.sample(frac=1, random_state=rng.randrange(2**31)).itertuples(index=False):
                 if shape == "entity":
                     yield {"passage": f"{r.title} {r.lead}", "meta": {"wiki_id": r.id, "title": r.title}}
-                else:
-                    hits = [clean(p) for p in r.text.split("\n") if len(clean(p)) >= 200 and CLIMATE.search(p)]
-                    p = next((h for h in hits if len(h) <= 1500), None)
-                    if p:
-                        yield {"passage": f"{r.title} {p}", "meta": {"wiki_id": r.id, "title": r.title}}
+                else:  # up to 3 climate paragraphs per article: only ~7.4k English articles pass the topic filter
+                    hits = [clean(p) for p in r.text.split("\n") if 200 <= len(clean(p)) <= 1500 and CLIMATE.search(p)]
+                    for k, p in enumerate(hits[:3]):
+                        yield {"passage": f"{r.title} {p}", "meta": {"wiki_id": r.id, "title": r.title, "para": k}}
 
 
 def read_jsonl(path):
@@ -147,12 +146,14 @@ def parse(text: str, ids: list[str]) -> dict[str, str]:
 
 def cmd_sample(a):
     os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True)
+    n = 0
     with open(a.out, "w", encoding="utf-8") as f:
-        for i, r in enumerate(sample(a.shape, a.n, a.seed)):
-            if i >= a.n:
+        for r in sample(a.shape, a.n, a.seed):
+            if n >= a.n:
                 break
-            f.write(json.dumps({"id": f"{a.shape}-{i}", "shape": a.shape, **r}, ensure_ascii=False) + "\n")
-    print(f"{min(i + 1, a.n)} {a.shape} passages -> {a.out}")
+            f.write(json.dumps({"id": f"{a.shape}-{n}", "shape": a.shape, **r}, ensure_ascii=False) + "\n")
+            n += 1
+    print(f"{n} {a.shape} passages -> {a.out}")
 
 
 def cmd_generate(a):
