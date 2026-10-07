@@ -57,8 +57,14 @@ Qwen3-0.6B's Touche (61.88) comes from `docs/phase1-baselines.md`.
 - **B, full BEIR ≥ 56.6 (T1): not yet measured.** The projection says it's borderline.
 
 ## What this says to do next (options for Pete)
-1. **Full 15-task BEIR eval of run #1** (~4 h on an A100 ≈ 25 units, or ~10 h on an L4 ≈ 17 units). It settles T1 and
-   calibrates Nano vs BEIR. Cheap, and worth knowing before spending more.
+1. **A larger eval of run #1's adapter** (the trained 7B; no new training).
+   - **Corrected 2026-10-07:** the *full* 15-task BEIR is ~33M passages. At the 7B's measured ~50 passages/s, that's
+     ~60 h and ~400 units, which isn't feasible on Colab credits. My earlier "~4 h, ~25 units" was wrong.
+   - **Feasible instead: "BEIR-15 lite."** MTEB's official HardNegatives versions of the 7 large tasks (ClimateFEVER,
+     DBPedia, FEVER, HotpotQA, NQ, MS MARCO, Quora; same queries and labels, corpus cut to the top ~250 candidates
+     per query) plus the 8 small tasks in full. That's ~2.0M passages, ~4–6 h, ~30–40 units after a speed test.
+   - **Comparable** with published scores for the same task versions (Qwen3, E5-Mistral, LLM2Vec), but **not** the
+     exact full-BEIR number for the T1 target (56.6). That needs the full corpora, reserved for a final model.
 2. **Task diversity: Track A / synthetic data aimed at the held-out task types** (PLAN §4.4, `docs/phase3-plan.md` §7).
    - Generate queries for argument / counter-argument, climate-claim, entity-search and citation-style retrieval from
      non-BEIR corpora (Wikipedia, S2ORC, args.me-style debate text), with the four generators already wired up:
