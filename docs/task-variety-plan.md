@@ -205,3 +205,51 @@ Training logs (every 5th step):
   Wikipedia pool, not from 4k sampled passages.
 - **Domain mismatch for V2:** Hansard speeches don't read like the debate-site arguments in Touche (args.me) or ArguAna
   (idebate), even though the model learned the synthetic task.
+
+### Full-size held-out eval + V3b (2026-10-07)
+Nano's ~50 queries per task can't resolve +1-point changes, so the saved 1B adapters were re-scored on the held-out
+tasks at full size: `eval --suite heldout` = ArguAna (1,406 queries), SCIDOCS (1,000), ClimateFEVER-HardNegatives
+(1,000), DBPedia-HardNegatives (400). **heldout-4** is their average. Touche2020 has only 49 queries even in full, so it
+stays on Nano. About 12 min per adapter on an A100 40GB (`notebooks/variety_heldout_colab.ipynb`).
+
+The `.v2` versions of the HardNegatives tasks only change the query instruction. We evaluate without instructions, so
+the scores are the same.
+
+**V3b:** V3's rows with negatives mined from a Wikipedia pool (`synth.py pool`, `rescore.py --pool`; release
+`data-variety-v3-pool`) instead of V3's 4k own pool:
+- 500,000 entity leads and 222,778 climate-term paragraphs.
+- Articles in the V3 passage sample are excluded.
+- Decontaminated against test documents (842 + 60 dropped).
+
+The guard now drops 11.6% (entity) and 5.2% (climate) of candidates, vs 0.5% and 1.1%, so the negatives are much
+closer. Entity batches still trained at 96–99% accuracy, though.
+
+| | B3 | V1 | V2 | V3 | V3b |
+|---|---|---|---|---|---|
+| ArguAna (full) | 52.42 | 54.94 | **55.07** | 53.98 | 52.64 |
+| SCIDOCS (full) | 19.54 | **20.72** | 19.22 | 19.52 | 19.79 |
+| ClimateFEVER-HN | 32.26 | 32.90 | 32.24 | 32.83 | **33.18** |
+| DBPedia-HN | 42.41 | **42.88** | 42.74 | 42.69 | 42.12 |
+| **heldout-4 (full size)** | **36.66** | **37.86 (+1.20)** | **37.32 (+0.66)** | **37.25 (+0.59)** | **36.93 (+0.27)** |
+| Nano avg-OOD-5 | 49.35 | 49.96 | 49.48 | 49.47 | 50.07 |
+| Nano avg-in-8 | 70.36 | 69.54 | 70.07 | 70.00 | 69.51 |
+
+**Reading it:**
+- **On the full-size tasks all four variants beat B3, and V1 clears the keep bar (+1.20).** The gain comes from
+  ArguAna (+2.5) and SCIDOCS (+1.2), the S2ORC citation target.
+- **V2's synthetic counter-arguments do help ArguAna (+2.65 on 1,406 queries),** which Nano couldn't show. Touche
+  remains unmeasurable at 49 queries.
+- **ArguAna rises 1.5–2.6 with V1, V2 and V3.** Part of the gain may be generic (any non-Track-B data), not
+  shape-specific.
+- **The large mining pool didn't pay off.** V3b improves ClimateFEVER-HN slightly (+0.9 vs B3, +0.35 vs V3) but not
+  DBPedia (−0.3), and loses V3's ArguAna gain. heldout-4 drops to 36.93, below V3. Better negatives alone don't make the
+  entity-search data teach DBPedia. The query style, or 4k rows at ~3% of steps, is the limit.
+- **In-domain cost:** Nano avg-in-8 is 0.3–0.9 below B3 for every variant. That's within Nano noise, but consistently
+  negative: each variant takes ~10–15% of a fixed 64k budget away from the eight in-domain tasks.
+
+**Decision:**
+- **Keep V1 (StackExchange + S2ORC) and V2 (argument + counter-argument).** V3's entity/claim data stays a candidate
+  for the combined run (small positive).
+- **Drop the V3b pool mining** (no gain for its cost).
+- **Next, V4:** V1 + V2 + V3 together at the same 64k budget, to see whether the held-out gains add up. Then 7B run #2
+  with the kept sources, ideally at a larger budget so the in-domain tasks don't lose their share.

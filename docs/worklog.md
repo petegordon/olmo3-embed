@@ -20,9 +20,9 @@ timestamps, so they include waiting and debugging, not just compute. Scores are 
 | 2. Recipe ablations (1B) | Oct 4, 20:12 – Oct 5, 04:20 | ~8 h (overnight) | ~16 | EOS pooling + no instructions: 57.51 avg-12 (from 16) |
 | 3. Track B data + proxy runs | Oct 5, 04:43 – Oct 6, 13:20 | ~32 h, incl. a ~14 h pause | ~47 | B3: 62.28 avg-13, 49.35 held-out; gate passed |
 | 4. 7B run #1 | Oct 6, 13:33–21:53 | ~8.5 h | ~55 | 65.93 avg-13: level with Qwen3-4B in-domain, −9.7 held-out |
-| 5. Task variety (in progress) | Oct 6, 21:39 → | ~16 h so far | ~28 so far | V1 +0.6, V2 +0.1, V3 +0.1 held-out: none clears the bar; effects ≈ Nano noise |
+| 5. Task variety (in progress) | Oct 6, 21:39 → | ~21 h so far | ~46 so far | Full-size held-out eval: V1 +1.20 (kept), V2 +0.66, V3 +0.59, V3b +0.27; Nano was too noisy to see it |
 
-**Total so far:** about 3 days of calendar time and ~150 Colab units. About 232 units are left.
+**Total so far:** about 3.2 days of calendar time and ~168 Colab units. About 214 units are left.
 
 ---
 
@@ -144,6 +144,10 @@ excluded for unclear reuse terms).
 | **V1 proxy run (p5-v1)** | 06:05–07:59 | **~2 h** (mining 138k docs, 1 h 20 min training, eval) | **+0.61 held-out, −0.82 in-domain**: below the bar; ~10 units |
 | V2/V3 collect + decontam + release `data-variety-synth-v1` | 09:40–09:47 | ~10 min | V2 7,989 rows, V3 7,981 rows |
 | **V2 + V3 proxy runs** | 09:50–13:16 | **~3.4 h** (mining ~5 min each, ~1.4 h training + 8 min eval per run) | V2 +0.13 held-out, V3 +0.12: both below the bar; ~18 units |
+| Pause Gemini (classifier blocked my kill; Pete ran the command) | 13:30 | — | Gemini kept: argument 1,775, counterargument 1,724, citation 2,000, entity 752 |
+| Full-size held-out suite + Wikipedia mining pool (`synth.py pool`, `rescore.py --pool`) | 13:20–14:05 | ~45 min | pools: 500k entity leads, 223k climate paragraphs |
+| **Full-size held-out eval of B3, V1, V2, V3** | ~15:00–16:03 | **~12 min each** | V1 37.86 (+1.20 vs B3's 36.66): first source to clear the bar; V2 +0.66, V3 +0.59 |
+| **V3b proxy run** (V3 + pool negatives) | 16:03–18:25 | ~2.4 h (mining ~25 min, training ~1.4 h, both evals) | 36.93: no better than V3; dropped. Session ~18 units |
 
 **Iterations:**
 - StackExchange's stackoverflow file is 7.8 GB → streaming with reservoir sampling.
@@ -171,6 +175,13 @@ excluded for unclear reuse terms).
 - **Measurement:** run-to-run noise on NanoBEIR (in-domain tasks swing 1–3 points between near-identical runs; Touche
   was below B3 in every run) is as large as the effects we're trying to see. The 5 held-out Nano tasks are too small
   to judge +1-point data changes on the 1B proxy.
+- **Full-size held-out eval was the missing yardstick.** At ~12 min and ~1 unit per 1B adapter, it showed V1 at
+  +1.20 (Nano said +0.61) and V2 helping ArguAna by +2.65 (Nano said 0). Use it for every proxy run from now on.
+- **Harder negatives aren't enough on their own:** a 500k-doc Wikipedia mining pool made V3's batches harder but didn't
+  improve DBPedia.
+- **Iterations:** pool build ran out of memory (exploding paragraphs copied each article's text onto every row); the
+  doc-decontam index only unpickled when its own script ran (`__main__.DocIndex`); Chrome disconnected, so Pete ran
+  Run all and granted access.
 - **Generators:** Claude and Codex are fast enough for pilot volumes (~2,000 queries per shape in a few hours); Gemini
   via Antigravity is several times slower; Codex is bounded by its usage window.
 - **Storage:** Pete is considering making Google Drive the shared store between the Windows laptop, the Mac (Colab CLI)
