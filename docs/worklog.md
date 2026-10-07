@@ -20,9 +20,9 @@ timestamps, so they include waiting and debugging, not just compute. Scores are 
 | 2. Recipe ablations (1B) | Oct 4, 20:12 – Oct 5, 04:20 | ~8 h (overnight) | ~16 | EOS pooling + no instructions: 57.51 avg-12 (from 16) |
 | 3. Track B data + proxy runs | Oct 5, 04:43 – Oct 6, 13:20 | ~32 h, incl. a ~14 h pause | ~47 | B3: 62.28 avg-13, 49.35 held-out; gate passed |
 | 4. 7B run #1 | Oct 6, 13:33–21:53 | ~8.5 h | ~55 | 65.93 avg-13: level with Qwen3-4B in-domain, −9.7 held-out |
-| 5. Task variety (in progress) | Oct 6, 21:39 → | ~12 h so far | ~10 so far | V1 public pairs: +0.6 held-out (below bar); V2/V3 synthetic running |
+| 5. Task variety (in progress) | Oct 6, 21:39 → | ~16 h so far | ~28 so far | V1 +0.6, V2 +0.1, V3 +0.1 held-out: none clears the bar; effects ≈ Nano noise |
 
-**Total so far:** about 3 days of calendar time and ~130 Colab units. About 250 units are left.
+**Total so far:** about 3 days of calendar time and ~150 Colab units. About 232 units are left.
 
 ---
 
@@ -143,7 +143,7 @@ excluded for unclear reuse terms).
 | V1 data to Colab | Oct 7, ~06:00 | — | private GitHub release asset `data-variety-v1` (49 MB) |
 | **V1 proxy run (p5-v1)** | 06:05–07:59 | **~2 h** (mining 138k docs, 1 h 20 min training, eval) | **+0.61 held-out, −0.82 in-domain**: below the bar; ~10 units |
 | V2/V3 collect + decontam + release `data-variety-synth-v1` | 09:40–09:47 | ~10 min | V2 7,989 rows, V3 7,981 rows |
-| **V2 + V3 proxy runs** | 09:50 → | ~3.5 h expected | running |
+| **V2 + V3 proxy runs** | 09:50–13:16 | **~3.4 h** (mining ~5 min each, ~1.4 h training + 8 min eval per run) | V2 +0.13 held-out, V3 +0.12: both below the bar; ~18 units |
 
 **Iterations:**
 - StackExchange's stackoverflow file is 7.8 GB → streaming with reservoir sampling.
@@ -164,6 +164,13 @@ excluded for unclear reuse terms).
   citations, and ArguAna rose +2.3. StackExchange taught almost nothing: its negatives came from other forums, so
   batches sat at accuracy 1.0. Carry S2ORC into the combined run; drop StackExchange unless negatives come from the
   same site.
+- **V2/V3:** synthetic data was learned (argument batches 4% → 75% accuracy) but didn't transfer to its targets beyond
+  noise (ClimateFEVER +1.4 and DBPedia +1.4 for V3; nothing on ArguAna/Touche for V2). Two reasons stand out:
+  entity and climate batches were trivially easy (own-pool negatives from 4k random Wikipedia passages), and Hansard
+  speeches don't read like debate-site arguments.
+- **Measurement:** run-to-run noise on NanoBEIR (in-domain tasks swing 1–3 points between near-identical runs; Touche
+  was below B3 in every run) is as large as the effects we're trying to see. The 5 held-out Nano tasks are too small
+  to judge +1-point data changes on the 1B proxy.
 - **Generators:** Claude and Codex are fast enough for pilot volumes (~2,000 queries per shape in a few hours); Gemini
   via Antigravity is several times slower; Codex is bounded by its usage window.
 - **Storage:** Pete is considering making Google Drive the shared store between the Windows laptop, the Mac (Colab CLI)

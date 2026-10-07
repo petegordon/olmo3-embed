@@ -163,3 +163,45 @@ from other forums, so they are trivially easy. That budget came out of the in-do
 
 **Next:** carry only S2ORCCitation into V4. Drop StackExchange unless its negatives are mined within the same site, and
 then only if it earns its place in a combined run.
+
+### V2 and V3: synthetic pilot (p5-v2, p5-v3, 2026-10-07)
+Claude + Codex queries (`synth.py`), decontaminated (3 V2 queries were exact Touche2020 test queries; 19 V3 passages
+overlapped test positives), release asset `data-variety-synth-v1`. Same recipe, budget and negatives as V1. Both runs
+in one Colab session (`notebooks/variety_synth_colab.ipynb`): ~3.4 h on A100 40GB, ~18 units.
+- **V2** (7,989 rows): SynthArgument + SynthCounterArgument on Hansard speeches, aimed at Touche2020 / ArguAna.
+- **V3** (7,981 rows): SynthEntitySearch + SynthClimateClaim on Wikipedia, aimed at DBPedia / ClimateFEVER.
+
+| Task | B3 | V1 | **V2** | **V3** |
+|---|---|---|---|---|
+| ArguAna | 53.93 | 56.25 | 53.95 | 54.11 |
+| ClimateFEVER | 38.70 | 39.03 | 39.32 | 40.13 |
+| DBPedia | 60.41 | 61.50 | 62.29 | 61.78 |
+| SCIDOCS | 39.59 | 41.04 | 39.54 | 41.27 |
+| Touche2020 | 54.12 | 52.00 | 52.32 | 50.04 |
+| **avg-OOD-5** | **49.35** | **49.96** | **49.48** | **49.47** |
+| **avg-in-8** | **70.36** | **69.54** | **70.07** | **70.00** |
+| avg-13 | 62.28 | 62.01 | 62.15 | 62.10 |
+
+Training logs (every 5th step):
+
+| Task | Share of steps | Batch accuracy, start → end |
+|---|---|---|
+| SynthArgument | ~5% | 0.04 → ~0.75 |
+| SynthCounterArgument | ~8% | 0.07 → ~0.93 |
+| SynthClimateClaim | ~6% | ~0.95 throughout |
+| SynthEntitySearch | ~3% | ~1.0 throughout |
+
+**Reading it:**
+- **None of V1–V3 clears the keep bar.** All three land at +0.1 to +0.6 on avg-OOD-5 and −0.3 to −0.8 on avg-in-8.
+- **Run-to-run noise is the same size as the effects.** V1–V3 are small variations of B3, yet in-domain tasks they
+  barely target swing by 1–3 points (SciFact 76.0–78.7, NFCorpus 33.0–35.9). Touche2020 is *below* B3 in all three
+  runs (50.0–52.3 vs 54.1), so B3's Touche was likely a high draw.
+- **Targeted tasks moved slightly in the right direction for V1 and V3,** within noise: SCIDOCS +1.5 from S2ORC
+  citations (V1); ClimateFEVER +1.4 and DBPedia +1.4 (V3). V2 didn't move ArguAna or Touche.
+- **Negatives decide whether a source teaches anything.** Own-pool mining only gives hard negatives when the pool is
+  topically dense. Hansard is (argument batches started at 4% accuracy), but random Wikipedia entities, climate
+  paragraphs and StackExchange posts are not: those batches sat at 95–100% accuracy, so they taught little. DBPedia and
+  ClimateFEVER retrieve from large Wikipedia corpora, so their synthetic data needs negatives mined from a large
+  Wikipedia pool, not from 4k sampled passages.
+- **Domain mismatch for V2:** Hansard speeches don't read like the debate-site arguments in Touche (args.me) or ArguAna
+  (idebate), even though the model learned the synthetic task.
