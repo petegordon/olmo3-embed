@@ -14,14 +14,14 @@ task's own positives pool).
 """
 import argparse
 import collections
-import gzip
+
 import json
 import os
 import random
 
 import pandas as pd
 from datasets import load_dataset
-from huggingface_hub import HfApi, hf_hub_download
+from huggingface_hub import HfApi
 
 from olmo3_embed.data.decontam import CACHE, iter_records, norm, test_tasks
 
@@ -35,30 +35,34 @@ def site_of(path: str) -> str:
     return path.split(".")[0]
 
 
-def ingest_stackexchange(per_site: int, seed: int, stats: dict) -> list[dict]:
+def ingest_stackexchange(per_site: int, seed: int, stats: dict, max_scan: int = 200_000) -> list[dict]:
+    """Streams each site file from the Hub (no full download: stackoverflow alone is 7.8 GB) and reservoir-samples
+    per_site posts from its first max_scan lines. Memory stays O(per_site)."""
     files = [f for f in HfApi().list_repo_files(SE_REPO, repo_type="dataset") if f.endswith(".jsonl.gz")]
-    rows, rng = [], random.Random(seed)
+    rows = []
     for f in sorted(files):
         site = site_of(f)
         if site in CQADUP_SITES:
             stats["stackexchange"]["excluded_cqadupstack_sites"] += 1
             continue
-        p = hf_hub_download(SE_REPO, f, repo_type="dataset", local_dir=f"{RAW}/stackexchange")
-        with gzip.open(p, "rt", encoding="utf-8") as fh:
-            recs = [json.loads(line) for line in fh if line.strip()]
-        rng.shuffle(recs)
-        n = 0
-        for i, r in enumerate(recs):
+        ds = load_dataset("json", data_files=f"hf://datasets/{SE_REPO}/{f}", split="train", streaming=True)
+        rng, keep, seen = random.Random(f"{seed}:{site}"), [], 0
+        for r in ds.take(max_scan):
             title, body = (r.get("texts") or [None, None])[:2]
             if not title or not body or len(body) < 40:
                 continue
+            seen += 1
+            item = (seen, title.strip(), body.strip())
+            if len(keep) < per_site:
+                keep.append(item)
+            elif (j := rng.randrange(seen)) < per_site:
+                keep[j] = item
+        for i, title, body in keep:
             rows.append({"qid": f"StackExchange:{site}:{i}", "task": "StackExchange", "source": f"{SE_REPO}/{site}",
-                         "query": title.strip(), "positives": [f"{title.strip()} {body.strip()}"], "negatives": []})
-            n += 1
-            if n >= per_site:
-                break
+                         "query": title, "positives": [f"{title} {body}"], "negatives": []})
         stats["stackexchange"]["sites"] += 1
-        stats["stackexchange"]["rows"] += n
+        stats["stackexchange"]["rows"] += len(keep)
+        print(f"  {site}: {len(keep)} of {seen} scanned", flush=True)
     return rows
 
 
