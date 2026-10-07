@@ -114,3 +114,14 @@ def test_upstream_negs_variant(tmp_path):
     o = pd.read_parquet(tmp_path / "o.parquet").set_index("qid")
     assert list(o.at["MSMARCO:1", "negatives"]) == [f"up{i}" for i in range(30)]  # upstream, capped, source order
     assert list(o.at["SciFact:2", "negatives"]) == ["mined2a", "mined2b"]  # no upstream: mined list kept
+
+
+def test_multiple_data_files_are_concatenated(tmp_path):
+    a = trackb(tmp_path, {"MSMARCO": 200})
+    rows = [{"query": f"se-q{i}", "task": "StackExchange", "positives": [f"se-p{i}"], "negatives": [f"se-n{i}_{j}" for j in range(5)],
+             "extra": 1} for i in range(200)]
+    b = tmp_path / "se.parquet"
+    pd.DataFrame(rows).to_parquet(b)
+    cfg = Config(data=f"{a},{b}", n_examples=0, batch_size=20, num_negatives=2, task_batching=True)
+    tasks = {bt[0]["task"] for bt in build_batches(cfg)}
+    assert tasks == {"MSMARCO", "StackExchange"}

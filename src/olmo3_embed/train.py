@@ -40,7 +40,7 @@ from olmo3_embed.model import INSTRUCTION_TEMPLATE, embed_batch, load_base, toke
 class Config:
     run_name: str = "proxy-base"
     model: str = "allenai/OLMo-2-0425-1B"
-    data: str = "data/msmarco_cocondenser_50k.parquet"
+    data: str = "data/msmarco_cocondenser_50k.parquet"  # or several, comma-separated (Track B + variety sources)
     n_examples: int = 16_000  # rows used from data (Phase 2 ablations: small, same for every arm); 0 = all
     # model / representation
     pooling: str = "mean"  # mean | last
@@ -96,7 +96,12 @@ def build_batches(cfg: Config) -> list[list[dict]]:
     """Deterministic for a seed: fixed rows, fixed shuffle, fixed negative sampling. Resume reuses the same list.
 
     Each row: query, task, positive (the one used), positives (all, for false-negative masking), negatives (k)."""
-    df = pd.read_parquet(cfg.data)
+    paths = [p.strip() for p in cfg.data.split(",") if p.strip()]  # several sources: Track B + task-variety data
+    if len(paths) == 1:
+        df = pd.read_parquet(paths[0])
+    else:
+        cols = ["query", "task", "positives", "negatives"]
+        df = pd.concat([pd.read_parquet(p, columns=cols) for p in paths], ignore_index=True)
     if "positive" in df.columns and not cfg.task_batching:  # Phase 2 parquet: exact original sampling order
         df = df.iloc[: cfg.n_examples] if cfg.n_examples else df
         rng = random.Random(cfg.seed)

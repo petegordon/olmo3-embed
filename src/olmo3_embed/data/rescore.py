@@ -43,8 +43,15 @@ MINE = {"SciFact": "scifact", "NFCorpus": "nfcorpus"}  # raw dirs written by bui
 RAW = os.environ.get("OLMO3_RAW", "data/raw")
 
 
+INSTRUCTIONS.update({  # task-variety sources (teacher prompts only; training uses no instructions)
+    "StackExchange": "Given a question title from a Q&A forum, retrieve the full question post",
+    "S2ORCCitation": "Given the title of a scientific paper, retrieve the titles of papers it cites",
+})
+DEFAULT_INSTRUCTION = "Given a query, retrieve relevant documents"
+
+
 def qtext(task: str, q: str) -> str:
-    return f"Instruct: {INSTRUCTIONS[task]}\nQuery:{q}"
+    return f"Instruct: {INSTRUCTIONS.get(task, DEFAULT_INSTRUCTION)}\nQuery:{q}"
 
 
 def load_model(max_len: int):
@@ -108,6 +115,22 @@ def mine(df: pd.DataFrame, model, batch_size: int, top: int = 100, lo: int = 10)
             pos = set(df.at[r, "positives"])
             df.at[r, "negatives"] = [corpus[j] for j in ids[lo - 1 :] if corpus[j] not in pos]
         print(f"  mined {task}: {len(rows)} queries over {len(corpus)} docs, ranks {lo}-{top}", flush=True)
+    # Tasks with no upstream negatives and no corpus file (task-variety sources: StackExchange, S2ORC citations,
+    # synthetic): mine from the task's own pool of positives, i.e. other rows' documents of the same kind.
+    for task in sorted(set(df.task) - set(MINE)):
+        rows = df.index[df.task == task]
+        if any(len(n) for n in df.loc[rows, "negatives"]):
+            continue
+        corpus = list(dict.fromkeys(p for P in df.loc[rows, "positives"] for p in P if p))
+        ce = torch.from_numpy(encode(model, corpus, batch_size)).cuda()
+        qs = [qtext(task, q) for q in df.loc[rows, "query"]]
+        for s in range(0, len(rows), 4096):  # chunked: a 60k x 60k score matrix wouldn't fit
+            qe = torch.from_numpy(encode(model, qs[s : s + 4096], batch_size)).cuda()
+            top_idx = (qe @ ce.T).topk(min(top, len(corpus)), dim=1).indices.cpu().numpy()
+            for r, ids in zip(rows[s : s + 4096], top_idx):
+                pos = set(df.at[r, "positives"])
+                df.at[r, "negatives"] = [corpus[j] for j in ids[lo - 1 :] if corpus[j] not in pos]
+        print(f"  mined {task} (own pool): {len(rows)} queries over {len(corpus)} docs, ranks {lo}-{top}", flush=True)
     return df
 
 
