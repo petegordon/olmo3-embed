@@ -66,6 +66,34 @@ usage cap), with **Claude, Codex and Gemini** for smaller, more diverse slices.
   proxy**, not by reading samples. The judge pilot showed OLMo-3.1-32B is a poor *judge*; whether it's a good
   *generator* is exactly what the pilot measures.
 
+## Vetted sources (checked live on HF, 2026-10-07)
+Each source's license is as declared on its card; there's been no separate legal review. Every row still goes through
+`decontam.py` (queries) and `doc_decontam.py` (passages).
+
+| Use | Source | Rows | License (card) | Notes |
+|---|---|---:|---|---|
+| StackExchange title→body | `flax-sentence-embeddings/stackexchange_title_body_jsonl` | 5.75M | CC BY-SA 4.0 (card text) | One file per site: **drop the 12 CQADupStack sites' files** |
+| Citations (SCIDOCS shape) | `sentence-transformers/s2orc` (`title-citation`, `title-abstract`) | 51M / 42M | ODC-By 1.0 (upstream S2ORC) | Title-dedupe against SCIDOCS; sample, don't use all of it |
+| Citations | `allenai/scirepeval` `cite_prediction_new` | 6.37M | ODC-BY (GitHub) | **Exclude `scidocs_*` configs** |
+| Argument text | `biglam/hansard_speech` | 2.69M speeches | CC-BY-4.0 | Drop procedural speeches |
+| Argument text | `common-pile/uk_hansard_filtered` | 47.9k sessions | Open Parliament Licence | Whole sessions; split into speeches |
+| Argument pairs (optional) | `ibm-research/argument_quality_ranking_30k` | 30.5k | CC-BY(-SA) 3.0 (card conflict) | Topic → argument; attribute as CC-BY-SA 3.0 |
+| Wikipedia (entity leads, climate, controversy sections) | `wikimedia/wikipedia` `20231101.en` | 6.41M | CC-BY-SA 3.0 / GFDL | Lead paragraphs overlap DBPedia-entity *corpus text*: `doc_decontam` drops test positives |
+| Abstracts (citation-style queries) | `common-pile/arxiv_abstracts` | 2.54M | CC0 | |
+| Entity queries | `facebook/kilt_tasks` (`structured_zeroshot`, `trex`) | 157k / 2.29M | MIT | Entity + relation queries, Wikipedia-linked |
+
+**Avoid:**
+
+| Source | Why |
+|---|---|
+| `DebateLabKIT/arguments-and-debates` | Contains idebate's Debatabase, ArguAna's test corpus |
+| `KShivendu/dbpedia-entities-openai-1M` (and similar copies) | Built from BEIR DBPedia-entity |
+| `sentence-transformers/stackexchange-duplicates` | No site column, so the CQADupStack forums can't be removed |
+| `allenai/specter` triples | Same origin as SCIDOCS |
+| ORCAS | Non-commercial terms |
+| Kialo, Reddit ChangeMyView | Unclear terms |
+| `flax-sentence-embeddings/stackexchange_*best_voted_answer*` | Card says CC-BY-NC-SA, which conflicts with upstream |
+
 ## Proxy experiments (Colab A100, OLMo-2-1B, B3 recipe)
 The baseline is **B3** (64k Track B rows, 496 steps): avg-13 62.28, **avg-OOD-5 49.35**. Every run uses the same
 compute (64k rows, 496 steps) and adds new tasks to the temperature mix, so any gain is from variety, not more steps.
