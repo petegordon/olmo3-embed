@@ -1,0 +1,28 @@
+# Phase 5 → 7B run #2 (docs/task-variety-plan.md, "7B run #2: recommendation"): run #1's recipe on Track B v1 + V1
+# (StackExchange + S2ORC) + V2 (synthetic argument / counter-argument, unfiltered) at 96k rows, so the new sources
+# come on top of Track B's share. Per-task instructions with 20% dropout (experiment A). No B, no V3.
+# GPU memory knobs (gradient_checkpointing, chunk_size) are set per runtime by the notebook's timing cell.
+run_name: p4-run2-7b
+model: allenai/Olmo-3-1025-7B
+data: data/trackb_v1/rescored.parquet,data/variety_v1/rescored.parquet,data/variety_v2/rescored.parquet
+n_examples: 96000
+pooling: last
+bidirectional: false
+instructions: true
+instruction_mode: per_task
+instruction_dropout: 0.2
+task_batching: true
+task_temperature: 0.5
+neg_pool: 10
+mask_false_negatives: true
+max_len_query: 64
+max_len_doc: 256
+num_negatives: 3
+temperature: 0.02
+batch_size: 128
+lora_r: 16
+lora_alpha: 32
+lr: 1.0e-4
+warmup_ratio: 0.05
+seed: 0
+save_every: 10           # ~8 min of 7B steps: a lost runtime costs at most that
