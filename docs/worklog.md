@@ -197,6 +197,48 @@ excluded for unclear reuse terms).
 - **Storage:** Pete is considering making Google Drive the shared store between the Windows laptop, the Mac (Colab CLI)
   and Colab; deferred for now. Data reaches Colab via private GitHub release assets in the meantime.
 
+### Colab CLI on the Mac (Oct 7, 22:34–23:05, ~30 min, < 0.5 units)
+From here on, a second Claude Code instance on Pete's Mac drives Colab with Google's Colab CLI (`colab`, v0.7.4,
+`uv tool install google-colab-cli`), with no browser. The CLI only supports Linux and macOS, which is why the Windows
+laptop used Chrome.
+
+| Step | Took | Result |
+|---|---|---|
+| Install + sign in (oauth2, petegordonusa@gmail.com) | ~5 min | Its own token in `~/.config/colab-cli/`; gcloud/ADC untouched |
+| CPU probes: secrets, `--env`, upload, Drive | ~15 min | Secrets don't work headless (see below) |
+| Drive wrapper + token script | ~10 min | `scripts/colab_drivemount.py`, `scripts/colab_secrets.sh` |
+| **A100 smoke** (`notebooks/colab_cli_smoke.ipynb`) | ~4 min GPU | A100-SXM4-40GB, token file read, Drive listed, clone OK; runtime deleted |
+
+**What's different under the CLI:**
+- **Runtimes:** `colab new --gpu A100 -s NAME` gave an A100 in ~3 s. `colab exec -s NAME -f nb.ipynb` runs a notebook
+  cell by cell and streams output, then saves `nb_output.ipynb` next to it (now gitignored). `colab stop -s NAME`
+  deletes the runtime.
+  - `colab exec --timeout` is an inactivity timeout (default 30 s).
+  - The CLI only sees runtimes it created, so a browser runtime (like A's) shows as `[?]` in `colab sessions` and
+    can't be attached to.
+- **Secrets:** `userdata.get` fails ("Secrets can only be fetched when running from the Colab UI"). The fix:
+  - `colab exec --env KEY=VALUE` works, but **writes the value in plain text** to `~/.config/colab-cli/history/*.jsonl`
+    and `colab.log`, so it's not used for secrets.
+  - `scripts/colab_secrets.sh` uploads the GitHub token from the macOS Keychain (`olmo3-colab-gh`, a fine-grained PAT
+    for the Colab repos) to `/root/.olmo3_GH_TOKEN`; uploads aren't logged.
+  - Cell 1's `secret(k)` reads that file, else `userdata`, so browser runs are unchanged. Only B's notebook has it
+    so far.
+- **Drive:** `colab drivemount` relays Colab's usual consent link, which is needed **again for every runtime** (it
+  isn't remembered). Under the CLI it waits for Enter on `/dev/tty`, while `drive.mount()` times out after 120 s.
+  `scripts/colab_drivemount.py` waits for a signal file instead and gives the consent 20 min. Once mounted, the
+  notebook's own `drive.mount()` just says "already mounted".
+- **Mac side:** Drive for desktop has petegordonusa@gmail.com, so `runs/` and `data/` are readable on the Mac (e.g. A's
+  final adapter appeared at 23:16). The VM can't see the Mac's copy.
+- `uv sync` failed on macOS (cu128 torch has no Mac wheels) → the CUDA index now applies only off macOS.
+
+**Iterations:** the first two consents timed out: the first from the 120 s mount limit, the second from my own 10-min
+wait, 24 s before Pete's "done". `colab upload` paths are relative to `/`, and the target folder must already exist
+(500 otherwise). The CLI's `colab.log` holds OAuth tokens at debug level and was world-readable → `chmod 600`.
+
+**Learned:** headless Colab works end to end and needs no tab, but each runtime still costs one human consent click
+for Drive. The HF storage plan (`docs/colab-hf-storage-plan.md`) would remove that: an HF token goes up like the GitHub
+token, with no consent.
+
 ---
 
 ## Recurring lessons

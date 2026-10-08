@@ -10,3 +10,5 @@ __pycache__/
 .venv/
 .ipynb_checkpoints/
 logs/
+# colab exec -f saves notebooks with outputs next to the source
+*_output.ipynb
