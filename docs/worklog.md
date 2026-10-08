@@ -20,9 +20,9 @@ timestamps, so they include waiting and debugging, not just compute. Scores are 
 | 2. Recipe ablations (1B) | Oct 4, 20:12 – Oct 5, 04:20 | ~8 h (overnight) | ~16 | EOS pooling + no instructions: 57.51 avg-12 (from 16) |
 | 3. Track B data + proxy runs | Oct 5, 04:43 – Oct 6, 13:20 | ~32 h, incl. a ~14 h pause | ~47 | B3: 62.28 avg-13, 49.35 held-out; gate passed |
 | 4. 7B run #1 | Oct 6, 13:33–21:53 | ~8.5 h | ~55 | 65.93 avg-13: level with Qwen3-4B in-domain, −9.7 held-out |
-| 5. Task variety (A done, B in progress) | Oct 6, 21:39 → | ~26 h so far | ~66 so far | Full-size held-out: V1 +1.20, V2 +0.66, V3 +0.59, V3b +0.27, V4 (all) +0.92: gains don't stack at 64k; carry V1 + V2 to 7B run #2 |
+| 5. Task variety (A and B done) | Oct 6, 21:39 → Oct 8, 02:30 | ~29 h | ~79 | Full-size held-out: V1 +1.20, V2 +0.66, V3 +0.59, V3b +0.27, V4 (all) +0.92: gains don't stack at 64k; carry V1 + V2 to 7B run #2; A (instructions) kept, B (stance negatives) dropped |
 
-**Total so far:** about 3.4 days of calendar time and ~188 Colab units. About 193 units are left.
+**Total so far:** about 3.5 days of calendar time and ~201 Colab units. About 174 units are left.
 
 ---
 
@@ -155,6 +155,9 @@ excluded for unclear reuse terms).
 | **A result (`p5-v2i`)** | 21:47–23:37 | ~1.9 h, ~10 units | heldout-4 37.92 (+0.60 vs p5-v2), Nano avg-in-8 70.70 (+0.63), avg-13 63.08 (best proxy yet): instructions kept for 7B run #2 |
 | Hand-off prompt for a Mac Claude Code instance (Colab CLI); B notebook `variety_b_stance_colab.ipynb` | 22:30 | ~15 min | Mac runs B once release `data-variety-v2b` exists |
 | B data: stance-flipped negatives (Claude 21:45–23:25, Codex 21:45–00:26), attach, release `data-variety-v2b` | 21:45–00:30 | Claude ~1.7 h, Codex ~2.7 h for 800 each | 1,600 negatives (median 1,307 chars), 0 test-document hits; 6,382 rows; ready for the Mac to run B |
+| B first attempt (Mac, Colab CLI): runtime + Drive consent, waiting cell for the release | 23:22–23:49 | ~0.5 h, ~2.6 units lost | the Mac idle-slept at 23:49, the CLI's websocket dropped, and Colab reclaimed the runtime before the data existed |
+| **B result (`p5-v2b`)**, headless, no Drive: Track B parquet uploaded from the Mac's Drive copy | 00:27–02:28 | ~2 h, ~10.5 units | heldout-4 37.12 (**−0.20 vs p5-v2**), **ArguAna −2.01**, avg-in-8 70.02 (−0.05): B not adopted |
+| 7B run #2 recommendation + cost (task-variety plan) | 02:30 | — | Track B + V1 + V2 at 96k, instructions + dropout, ≈ 75 units (70–85), timing trial first |
 
 **Iterations:**
 - StackExchange's stackoverflow file is 7.8 GB → streaming with reservoir sampling.
@@ -240,6 +243,18 @@ laptop used Chrome.
 **Iterations:** the first two consents timed out: the first from the 120 s mount limit, the second from my own 10-min
 wait, 24 s before Pete's "done". `colab upload` paths are relative to `/`, and the target folder must already exist
 (500 otherwise). The CLI's `colab.log` holds OAuth tokens at debug level and was world-readable → `chmod 600`.
+
+**Running B headless (Oct 8, 00:27–02:28):**
+- **The Mac must stay awake.** Claude Code holds `caffeinate` only for 300 s per tool call, so between turns the Mac
+  idle-slept (23:49) and the CLI's websocket dropped. With no client connected, Colab reclaimed the runtime (first
+  attempt, ~2.6 units). The rerun ran under `caffeinate -ims` and stayed connected for 2 h.
+- **Without Drive:** `colab upload` takes one base64 request per file and rejects ~100 MB (50 MB works, ~7 MB/s). The
+  2.5 GB Track B parquet went up from the Mac's Drive for desktop copy in 48 × 50 MB parts (~7 min) and was joined
+  and checked by sha256 on the VM. The adapter and V2b data came back as 40 MB parts into the Mac's Drive folder,
+  which syncs to Drive. No consent click was needed, but checkpoints don't survive a lost runtime.
+- **The exec ended with `TimeoutError: Timeout waiting for reply`** right after the push (the last cell never
+  started), so the auto-cleanup didn't run. I packed, downloaded and deleted the runtime by hand ~2 min later.
+  Cleanup should check the result on `colab-results`, not the exec's exit status.
 
 **Learned:** headless Colab works end to end and needs no tab, but each runtime still costs one human consent click
 for Drive. The HF storage plan (`docs/colab-hf-storage-plan.md`) would remove that: an HF token goes up like the GitHub

@@ -341,3 +341,61 @@ About 2 h on an A100 40GB (~10 units), training and both evals.
 - heldout-4's +0.60 is under the +1 keep bar on its own, but nothing else got held-out *and* in-domain to rise together.
 - **Decision:** **keep instructions (per-task, 20% dropout) for 7B run #2.** Instruction-tuned 7B models (E5-Mistral,
   Qwen3, NV-Embed) benefit more from instructions than a 1B LoRA does, and this result no longer argues against them.
+
+### B result: round-trip filter + stance-flipped negatives (p5-v2b, 2026-10-08)
+Run headless from the Mac with the Colab CLI (first CLI run). Training from 00:37 (495 steps, 10.9 s/step), then Nano and
+held-out evals, pushed 02:26. ~13 units in total, of which ~2.6 were lost on a first attempt (worklog).
+
+| | p5-v2 (V2, no instructions) | p5-v2i (A) | **p5-v2b (B)** | B − p5-v2 |
+|---|---|---|---|---|
+| ArguAna (full) | 55.07 | 56.11 | **53.06** | **−2.01** |
+| SCIDOCS (full) | 19.22 | 19.73 | 19.82 | +0.60 |
+| ClimateFEVER-HN | 32.24 | 31.14 | 32.97 | +0.73 |
+| DBPedia-HN | 42.74 | 44.68 | 42.64 | −0.10 |
+| **heldout-4 (full size)** | 37.32 | **37.92** | **37.12** | **−0.20** |
+| Nano avg-OOD-5 | 49.48 | 50.88 | 49.02 | −0.46 |
+| **Nano avg-in-8** | 70.07 | 70.70 | 70.02 | −0.05 |
+| Nano avg-13 | 62.15 | 63.08 | 61.95 | −0.20 |
+
+(p5-v2b, like p5-v2i, is scored on the `.v2` HardNegatives tasks; p5-v2 on v1. Same documents and qrels.)
+
+**Reading it:**
+- **B misses the bar, and its target got worse.** ArguAna, the task the stance negatives were built for, fell 2.0 points
+  on its 1,406 full-size queries, the largest single held-out move in Phase 5. In-domain is unchanged.
+- **The negatives did make the task harder,** but harder didn't transfer. SynthCounterArgument batches ended at loss
+  0.81 / accuracy 0.79 vs 0.30 / 0.93 for p5-v2 (only 4–8 logged steps per task, so this is indicative only).
+- **Likely reasons** (not separated, since one run changes both the filter and the negatives):
+  - The filter cut V2 by 20% (SynthArgument by a third), so the debate tasks got fewer batches: 9 logged synthetic
+    steps vs 13.
+  - The negatives are LLM-written while the positives are Hansard speeches. The model can learn "generated text is
+    the wrong answer" instead of "this passage agrees rather than rebuts", which helps nothing on ArguAna, where every
+    candidate is human-written.
+- **Decision:** don't adopt B. Use V2 unfiltered and without stance negatives. If stance negatives get another try,
+  they'd need to be in the positive's own register (e.g. real same-side Hansard speeches from the same debate), and
+  the filter would need its own ablation.
+
+## 7B run #2: recommendation (2026-10-08, for Pete's approval)
+**Data and recipe:**
+- Track B v1 + V1 (StackExchange + S2ORC) + V2 (unfiltered), **96k rows**, run #1's recipe otherwise.
+- Instructions per task with 20% dropout (A's decision).
+- No B (filter or stance negatives); no V3.
+- 96k rather than 64k so the new sources come on top of Track B's share: at a fixed 64k, every variant cost in-domain
+  points (V4), and the 7B's in-domain lead is the asset to keep.
+
+**Cost, scaled from measured runs (to confirm with a timing trial before the full run):**
+
+| Item | Basis | Estimate |
+|---|---|---|
+| Training: 750 steps (96k / 128) | run #1: 43.9 s/step on A100 80GB; the variety mixes run ~4% slower than B3 on the 1B (10.85 vs 10.48 s/step) → ~45.5 s/step | **~9.5 h ≈ 64 units** at 6.77 u/h |
+| Timing trial (4 steps per setting) + smoke | Phase 4 step 0 | ~0.5 h ≈ 3 units |
+| Nano eval (7B) | 1B Nano ~7 min × ~4.2 (7B/1B step-time ratio) | ~30 min ≈ 3–4 units |
+| Full-size held-out eval (7B) | 1B ~12 min × ~4.2; **not measured at 7B** | ~50 min ≈ 6 units |
+| **Total** | | **≈ 75 units (range 70–85)** |
+
+- **Balance:** 174.2 units after B → ~95–100 left after run #2.
+- **Hardware:** run #1 used an A100 80GB (High-RAM, 6.77 u/h; no gradient checkpointing, chunk 8). The CLI's
+  `colab new --gpu A100` gave a 40GB card; whether `--high-mem` gives the 80GB is the first thing the timing trial
+  checks. On 40GB it needs gradient checkpointing: slower per step, cheaper per hour, so measure before choosing.
+- **How it would run:** headless from the Mac, under `caffeinate`, with Drive mounted once at the start (one consent
+  click) so checkpoints every 10 steps survive a lost runtime. That matters for a ~10 h run; B could skip Drive, run
+  #2 shouldn't.
