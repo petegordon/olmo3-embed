@@ -158,6 +158,7 @@ excluded for unclear reuse terms).
 | B first attempt (Mac, Colab CLI): runtime + Drive consent, waiting cell for the release | 23:22–23:49 | ~0.5 h, ~2.6 units lost | the Mac idle-slept at 23:49, the CLI's websocket dropped, and Colab reclaimed the runtime before the data existed |
 | **B result (`p5-v2b`)**, headless, no Drive: Track B parquet uploaded from the Mac's Drive copy | 00:27–02:28 | ~2 h, ~10.5 units | heldout-4 37.12 (**−0.20 vs p5-v2**), **ArguAna −2.01**, avg-in-8 70.02 (−0.05): B not adopted |
 | 7B run #2 recommendation + cost (task-variety plan) | 02:30 | — | Track B + V1 + V2 at 96k, instructions + dropout, ≈ 75 units (70–85), timing trial first |
+| **7B run #2 (`p4-run2-7b`), session 1**, headless (Colab CLI, A100 80GB via `--high-mem`, 6.77 u/h) | Oct 8, 06:17–12:13 | ~6 h, ~39 units | timing trial 58 s/step (4 steps; ckpt-c16 69) → actual ~47 s/step avg; **paused at checkpoint step 410 / 743** for Pete to disconnect; resumes tonight from Drive |
 
 **Iterations:**
 - StackExchange's stackoverflow file is 7.8 GB → streaming with reservoir sampling.
@@ -255,6 +256,20 @@ wait, 24 s before Pete's "done". `colab upload` paths are relative to `/`, and t
 - **The exec ended with `TimeoutError: Timeout waiting for reply`** right after the push (the last cell never
   started), so the auto-cleanup didn't run. I packed, downloaded and deleted the runtime by hand ~2 min later.
   Cleanup should check the result on `colab-results`, not the exec's exit status.
+
+**7B run #2, session 1 (Oct 8, 06:17–12:13):**
+- `colab new --gpu A100 --high-mem` gives the A100-SXM4-80GB High-RAM shape (6.77 u/h), same as run #1's browser runtime.
+- **I lost a runtime to my own bug** (~2.5 units, plus one more Drive consent): the train-only notebook skipped the
+  setup cell, so it ran in `/content` (a later `colab exec` doesn't keep the earlier one's `%cd`) and couldn't find
+  the config. `colab exec -f` also **keeps going after a failed cell**, and my done marker printed unconditionally,
+  so the script deleted the runtime. Fix: the run notebook always includes the setup cells, and the done marker
+  prints only if `runs/<run>/.pushed` exists.
+- **A network drop doesn't kill the runtime while the Mac is awake.** The websocket dropped at 07:42, and the CLI
+  noticed at 07:51. Training kept going (Drive checkpoints at 07:48 and later), and the next `colab exec` queued its
+  cells behind the running one. Progress was then read from the checkpoint step on Drive, through the Mac's Drive
+  copy.
+- **Pausing for a disconnect:** wait for the next checkpoint (every 10 steps ≈ 8 min) to land in the Mac's Drive
+  copy, then `colab stop`. Done at step 410 with nothing lost.
 
 **Learned:** headless Colab works end to end and needs no tab, but each runtime still costs one human consent click
 for Drive. The HF storage plan (`docs/colab-hf-storage-plan.md`) would remove that: an HF token goes up like the GitHub
