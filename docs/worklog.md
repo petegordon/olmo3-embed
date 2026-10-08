@@ -152,6 +152,7 @@ excluded for unclear reuse terms).
 | Outside review of the pipeline → experiments A (instructions + dropout) and B (filter + stance negatives) | 21:15–21:35 | ~20 min | kept 3 ideas, rejected 4 with reasons (task-variety plan) |
 | A: `instruction_dropout`, instructions for new tasks, held-out suite on `.v2` tasks; launch `p5-v2i` | 21:35–21:47 | ~12 min + Colab | training from 21:47 |
 | B: round-trip filter (laptop GPU), stance-negative generator, attach, rescore support | 21:40–22:05 | ~25 min | filter kept 6,382 / 7,989; Claude + Codex generating 1,600 negatives |
+| **A result (p5-v2i)** | 21:47–23:37 | ~1.85 h Colab (browser) | heldout-4 37.92 (**+0.60 vs p5-v2**, below the bar); Nano avg-in-8 70.70 (+0.63), avg-OOD-5 50.88 (+1.40); instructions no longer hurt; ~10 units |
 
 **Iterations:**
 - StackExchange's stackoverflow file is 7.8 GB → streaming with reservoir sampling.

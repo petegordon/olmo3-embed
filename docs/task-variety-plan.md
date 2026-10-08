@@ -314,3 +314,21 @@ heldout-4 37.32, Nano avg-in-8 70.07), which has the same data and differs only 
     and `rescore.py` puts them first, exempt from the 95% guard.
   - **Smoke test:** the Qwen3-0.6B teacher scores the agreeing passage *above* the real rebuttal in 31 of 32 rows. That
     is the confusion B targets, and why the guard can't be applied to these negatives.
+
+### Result A: instructions + 20% dropout (`p5-v2i`, 2026-10-07)
+Pushed 23:37 (Windows instance's browser runtime, ~1.85 h, ~10 units). Compared with p5-v2 (same data, no instructions):
+
+| | ArguAna | SCIDOCS | ClimateFEVER-HN | DBPedia-HN | **heldout-4** | Nano avg-in-8 | Nano avg-OOD-5 |
+|---|---|---|---|---|---|---|---|
+| p5-v2 | 55.07 | 19.22 | 32.24 | 42.74 | 37.32 | 70.07 | 49.48 |
+| **p5-v2i** | 56.11 | 19.73 | 31.14 | 44.68 | **37.92** | 70.70 | 50.88 |
+| Δ | +1.04 | +0.51 | −1.10 | +1.94 | **+0.60** | +0.63 | +1.40 |
+
+- **Below the bar** (heldout-4 +0.60, under ~1), with no in-domain loss: avg-in-8 +0.63, best avg-13 so far (63.08).
+- **Instructions no longer hurt.** B2 lost 4.6 points with instructions on 8 search-like tasks. With varied task shapes
+  and 20% dropout they're neutral to slightly positive. Nano MSMARCO +5.0 and Touche +2.7 are single-task noise
+  territory.
+- The held-out runs differ in one more way: p5-v2i is scored on the `.v2` HardNegatives tasks with their query prompts
+  (same documents and qrels). So ClimateFEVER −1.10 / DBPedia +1.94 mix the instruction effect with the prompt.
+- **Verdict:** not adopted on its own merit. It costs nothing at inference, so it can ride along in 7B run #2 if B
+  doesn't win outright; at 7B scale the gain may differ either way.
