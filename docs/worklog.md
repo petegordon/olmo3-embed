@@ -154,6 +154,7 @@ excluded for unclear reuse terms).
 | B: round-trip filter (laptop GPU), stance-negative generator, attach, rescore support | 21:40–22:05 | ~25 min | filter kept 6,382 / 7,989; Claude + Codex generating 1,600 negatives |
 | **A result (`p5-v2i`)** | 21:47–23:37 | ~1.9 h, ~10 units | heldout-4 37.92 (+0.60 vs p5-v2), Nano avg-in-8 70.70 (+0.63), avg-13 63.08 (best proxy yet): instructions kept for 7B run #2 |
 | Hand-off prompt for a Mac Claude Code instance (Colab CLI); B notebook `variety_b_stance_colab.ipynb` | 22:30 | ~15 min | Mac runs B once release `data-variety-v2b` exists |
+| B data: stance-flipped negatives (Claude 21:45–23:25, Codex 21:45–00:26), attach, release `data-variety-v2b` | 21:45–00:30 | Claude ~1.7 h, Codex ~2.7 h for 800 each | 1,600 negatives (median 1,307 chars), 0 test-document hits; 6,382 rows; ready for the Mac to run B |
 | **A result (p5-v2i)** | 21:47–23:37 | ~1.85 h Colab (browser) | heldout-4 37.92 (**+0.60 vs p5-v2**, below the bar); Nano avg-in-8 70.70 (+0.63), avg-OOD-5 50.88 (+1.40); instructions no longer hurt; ~10 units |
 
 **Iterations:**
