@@ -132,7 +132,7 @@ PROMPT_SHA = hashlib.sha1((TEMPLATE + json.dumps({k: v[2] for k, v in SHAPES.ite
                           ).hexdigest()[:12]
 
 
-def parse(text: str, ids: list[str]) -> dict[str, str]:
+def parse(text: str, ids: list[str], max_len: int = 600, min_len: int = 3) -> dict[str, str]:
     dec, obj = json.JSONDecoder(), None
     for m in re.finditer(r'\{\s*"items"', text):  # the last decodable {"items": ...} wins (CLIs may echo the prompt)
         try:
@@ -142,7 +142,7 @@ def parse(text: str, ids: list[str]) -> dict[str, str]:
     out = {}
     for it in (obj or {}).get("items", []):
         q = clean(str(it.get("query", ""))) if isinstance(it, dict) else ""
-        if isinstance(it, dict) and str(it.get("id")) in ids and 3 <= len(q) <= 600 and q != "<text>":
+        if isinstance(it, dict) and str(it.get("id")) in ids and min_len <= len(q) <= max_len and q not in ("<text>", "<new passage>"):
             out[str(it["id"])] = q
     return out
 
@@ -235,6 +235,103 @@ def cmd_pool(a):
     print(f"{len(keep):,} {a.shape} pool docs ({hits} dropped by doc decontam) -> {a.out}")
 
 
+def cmd_filter(a):
+    """Round-trip consistency filter (Promptagator): keep a synthetic pair only if its own passage ranks in the top
+    --top for its query among all passages of the same task, scored by the rescore teacher (Qwen3-Embedding-0.6B).
+    A query its own passage can't win was written too loosely to teach the task shape."""
+    import numpy as np
+    import pandas as pd
+    import torch
+    from olmo3_embed.data.rescore import encode, load_model, qtext
+
+    df = pd.read_parquet(a.data)
+    model = load_model(256)
+    keep, ranks = np.zeros(len(df), bool), np.zeros(len(df), int)
+    for task, d in df.groupby("task"):
+        pool = list(dict.fromkeys(p for P in d.positives for p in P))
+        pe = torch.from_numpy(encode(model, pool, 64)).float()
+        qe = torch.from_numpy(encode(model, [qtext(task, q) for q in d["query"]], 64)).float()
+        S = qe @ pe.T
+        own = torch.tensor([pool.index(P[0]) for P in d.positives])
+        r = (S > S[torch.arange(len(d)), own][:, None]).sum(1).numpy() + 1  # 1 = own passage ranks first
+        ranks[d.index], keep[d.index] = r, r <= a.top
+        print(f"  {task}: {len(d)} pairs, median rank {int(np.median(r))}, top-1 {np.mean(r == 1):.0%}, "
+              f"kept {int((r <= a.top).sum())} (rank <= {a.top})", flush=True)
+    df.assign(rt_rank=ranks)[keep].to_parquet(a.out, index=False)
+    print(f"kept {int(keep.sum())} / {len(df)} -> {a.out}")
+
+
+NEG_TEMPLATE = """You are creating hard negatives for a counter-argument retrieval model.
+
+Each item has an ARGUMENT and a PASSAGE (a UK House of Commons speech) that rebuts it. For each item, write a NEW
+passage that SUPPORTS the argument instead of rebutting it, so a search for "the passage that rebuts this argument"
+should NOT return it:
+- same topic and the same key terms as the original passage, so it can't be told apart by topic or keywords;
+- same register: a UK parliamentary speech, similar length (100-250 words), no headings, no meta-commentary;
+- it must agree with the argument; do not copy sentences from the original passage.
+First state the argument's core premise ("premise"), then how your passage supports it ("strategy"), then the passage.
+
+Reply with JSON only, no prose: {{"items": [{{"id": "<id>", "premise": "...", "strategy": "...", "query": "<new passage>"}}, ...]}}
+
+ITEMS:
+{items}"""
+
+
+def cmd_negatives(a):
+    """Stance-flipped hard negatives for SynthCounterArgument rows (experiment B): same topic and keywords as the
+    positive, but agreeing with the query. Written by a subscription CLI; resumable like generate."""
+    import pandas as pd
+    from olmo3_embed.data.judge.backends import BACKENDS
+
+    df = pd.read_parquet(a.data)
+    df = df[df.task == "SynthCounterArgument"].sort_values("qid")
+    items = [{"id": r.qid, "argument": r.query, "passage": r.positives[0]} for r in df.itertuples()]
+    items = items[a.part :: a.parts][: a.limit or None]
+    done = {r["id"] for r in read_jsonl(a.out)}
+    todo = [it for it in items if it["id"] not in done]
+    print(f"{len(items)} rows in part {a.part}/{a.parts}, {len(done)} done, {len(todo)} to go ({a.backend})", flush=True)
+    if not todo:
+        return
+    backend = BACKENDS[a.backend](**({"model": a.model} if a.model else {}))
+    model = getattr(backend, "model", None) or a.backend
+    groups = [todo[i : i + a.batch] for i in range(0, len(todo), a.batch)]
+    with open(a.out, "a", encoding="utf-8") as f:
+        for s in range(0, len(groups), a.chunk):
+            chunk = groups[s : s + a.chunk]
+            prompts = [NEG_TEMPLATE.format(items="\n\n".join(
+                f"[id: {it['id']}]\nARGUMENT: {it['argument'][:600]}\nPASSAGE: {it['passage'][:PROMPT_CHARS]}" for it in g))
+                for g in chunk]
+            for g, raw in zip(chunk, backend(prompts)):
+                got = parse(raw, [it["id"] for it in g], max_len=2500, min_len=300)
+                for it in g:
+                    if it["id"] in got:
+                        f.write(json.dumps({"id": it["id"], "negative": got[it["id"]], "generator": a.backend,
+                                            "model": model}, ensure_ascii=False) + "\n")
+            f.flush()
+            print(f"  {min(s + a.chunk, len(groups))}/{len(groups)} prompts", flush=True)
+
+
+def cmd_attach(a):
+    """Join generated negatives (cmd_negatives output) onto their rows as a gen_negatives column (rescore.py puts
+    them first and exempts them from the 95% guard). Generated text is checked against test documents like any
+    passage. Writes <out> ready for rescore.py --data (as decontam.parquet)."""
+    import pandas as pd
+    from olmo3_embed.data import doc_decontam
+
+    df = pd.read_parquet(a.data)
+    idx, neg, hits = doc_decontam.load(), {}, 0
+    for p in a.negatives:
+        for r in read_jsonl(p):
+            if idx.check(r["negative"]):
+                hits += 1
+            else:
+                neg.setdefault(r["id"], []).append(r["negative"])
+    df["gen_negatives"] = df.qid.map(lambda q: neg.get(q, []))
+    df.to_parquet(a.out, index=False, row_group_size=20_000)
+    print(f"{len(df)} rows, {int((df.gen_negatives.map(len) > 0).sum())} with generated negatives "
+          f"({hits} dropped by doc decontam) -> {a.out}")
+
+
 def cmd_collect(a):
     import pandas as pd
     rows = []
@@ -276,8 +373,27 @@ def main():
     p.add_argument("--exclude", required=True, help="the shape's passages file: its articles stay out of the pool")
     p.add_argument("--seed", type=int, default=1)
     p.add_argument("--out", required=True)
+    fl = sub.add_parser("filter")
+    fl.add_argument("--data", required=True)
+    fl.add_argument("--top", type=int, default=10)
+    fl.add_argument("--out", required=True)
+    n = sub.add_parser("negatives")
+    n.add_argument("--data", required=True)
+    n.add_argument("--backend", required=True)
+    n.add_argument("--model")
+    n.add_argument("--part", type=int, default=0)
+    n.add_argument("--parts", type=int, default=1)
+    n.add_argument("--limit", type=int, default=0, help="rows per part (0 = all)")
+    n.add_argument("--batch", type=int, default=4, help="rows per prompt (outputs are whole passages)")
+    n.add_argument("--chunk", type=int, default=4)
+    n.add_argument("--out", required=True)
+    at = sub.add_parser("attach")
+    at.add_argument("--data", required=True)
+    at.add_argument("--negatives", nargs="+", required=True)
+    at.add_argument("--out", required=True)
     a = ap.parse_args()
-    {"sample": cmd_sample, "generate": cmd_generate, "collect": cmd_collect, "pool": cmd_pool}[a.cmd](a)
+    {"sample": cmd_sample, "generate": cmd_generate, "collect": cmd_collect, "pool": cmd_pool, "filter": cmd_filter,
+     "negatives": cmd_negatives, "attach": cmd_attach}[a.cmd](a)
 
 
 if __name__ == "__main__":

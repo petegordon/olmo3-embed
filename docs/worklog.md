@@ -20,7 +20,7 @@ timestamps, so they include waiting and debugging, not just compute. Scores are 
 | 2. Recipe ablations (1B) | Oct 4, 20:12 – Oct 5, 04:20 | ~8 h (overnight) | ~16 | EOS pooling + no instructions: 57.51 avg-12 (from 16) |
 | 3. Track B data + proxy runs | Oct 5, 04:43 – Oct 6, 13:20 | ~32 h, incl. a ~14 h pause | ~47 | B3: 62.28 avg-13, 49.35 held-out; gate passed |
 | 4. 7B run #1 | Oct 6, 13:33–21:53 | ~8.5 h | ~55 | 65.93 avg-13: level with Qwen3-4B in-domain, −9.7 held-out |
-| 5. Task variety (1B proxy done) | Oct 6, 21:39 – Oct 7, 21:08 | ~23.5 h | ~56 | Full-size held-out: V1 +1.20, V2 +0.66, V3 +0.59, V3b +0.27, V4 (all) +0.92: gains don't stack at 64k; carry V1 + V2 to 7B run #2 |
+| 5. Task variety (A and B running) | Oct 6, 21:39 → | ~24.5 h so far | ~56 so far | Full-size held-out: V1 +1.20, V2 +0.66, V3 +0.59, V3b +0.27, V4 (all) +0.92: gains don't stack at 64k; carry V1 + V2 to 7B run #2 |
 
 **Total so far:** about 3.3 days of calendar time and ~178 Colab units. About 204 units are left.
 
@@ -149,6 +149,9 @@ excluded for unclear reuse terms).
 | **Full-size held-out eval of B3, V1, V2, V3** | ~15:00–16:03 | **~12 min each** | V1 37.86 (+1.20 vs B3's 36.66): first source to clear the bar; V2 +0.66, V3 +0.59 |
 | **V3b proxy run** (V3 + pool negatives) | 16:03–18:25 | ~2.4 h (mining ~25 min, training ~1.4 h, both evals) | 36.93: no better than V3; dropped. Session ~18 units |
 | **V4 proxy run** (V1 + V2 + V3 combined) | 19:13–21:08 | ~1.9 h (training 492 steps ~1.5 h, Nano 7 min, held-out 12 min) | heldout-4 37.58 (+0.92): below V1 alone; best ArguAna (56.0) and best Nano avg-13 (62.35); ~10 units |
+| Outside review of the pipeline → experiments A (instructions + dropout) and B (filter + stance negatives) | 21:15–21:35 | ~20 min | kept 3 ideas, rejected 4 with reasons (task-variety plan) |
+| A: `instruction_dropout`, instructions for new tasks, held-out suite on `.v2` tasks; launch `p5-v2i` | 21:35–21:47 | ~12 min + Colab | training from 21:47 |
+| B: round-trip filter (laptop GPU), stance-negative generator, attach, rescore support | 21:40–22:05 | ~25 min | filter kept 6,382 / 7,989; Claude + Codex generating 1,600 negatives |
 
 **Iterations:**
 - StackExchange's stackoverflow file is 7.8 GB → streaming with reservoir sampling.
@@ -183,6 +186,9 @@ excluded for unclear reuse terms).
 - **Combining sources at a fixed budget dilutes them (V4).** The held-out gains overlap on ArguAna instead of adding
   up, and the Wikipedia-style tasks (ClimateFEVER, DBPedia, FEVER) lose ground as Track B's share shrinks. The fix is
   a bigger budget, not fewer sources.
+- **The teacher can't see stance.** Qwen3-0.6B ranks a passage that agrees with an argument above the real rebuttal in
+  31 of 32 rows, so guard rules built on the teacher would have thrown away every stance negative. That's also the
+  clearest picture yet of why ArguAna is hard for similarity-trained embedders.
 - **Iterations:** pool build ran out of memory (exploding paragraphs copied each article's text onto every row); the
   doc-decontam index only unpickled when its own script ran (`__main__.DocIndex`); Chrome disconnected, so Pete ran
   Run all and granted access. On V4's restart one of my clicks added an empty text cell; deleted before rerunning.

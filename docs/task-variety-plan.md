@@ -282,3 +282,35 @@ Track B v1 + V1 + V2 + V3 (all own-pool rescored) at B3's recipe and 64k-row bud
   dropped: no full-size gain on its targets, and it costs FEVER-style steps.
 - **Budget:** more than 64k rows, so the added sources come *on top of* Track B's share instead of out of it. Every
   variant cost avg-in-8 at a fixed 64k, and the 7B's in-domain lead is the asset to keep.
+
+## Experiments A and B (approved 2026-10-07)
+Prompted by an outside review of the pipeline. What we took from it, what we didn't, and why:
+- **Taken:**
+  - Re-test instructions now that the training data has held-out shapes (A).
+  - Stance-flipped hard negatives for counter-argument retrieval (B).
+  - A round-trip consistency filter for synthetic pairs (B).
+- **Not taken:**
+  - *Asymmetric instructions:* already in place (queries only).
+  - *Causal attention as the ceiling:* Qwen3-Embedding is causal + EOS, and our 7B matches Qwen3-4B in-domain.
+  - *MNTP / latent-attention pooling:* new architecture work, and the gap is in the data.
+  - *NLI "contradiction = negative" for ClimateFEVER:* ClimateFEVER counts refuting evidence as relevant.
+
+Both are 1B proxy runs at B3's recipe and 64k rows, compared with **p5-v2** (Track B + V2, no instructions:
+heldout-4 37.32, Nano avg-in-8 70.07), which has the same data and differs only in what each experiment changes.
+- **A, `p5-v2i`** (`notebooks/variety_a_instr_colab.ipynb`): per-task query instructions, 20% instruction dropout.
+  - MTEB prompts for Track B tasks; our own for the new tasks (`train.py` `EXTRA_INSTRUCTIONS`).
+  - Dropout is decided by a hash of the query (`instruction_dropout`).
+  - Phase 3's B2 (−4.6) trained on only 8 search-like tasks.
+  - The held-out suite now uses the HardNegatives `.v2` tasks, which carry query prompts; the data is identical to v1.
+- **B, `p5-v2b`**: V2 after a round-trip filter, plus stance-flipped negatives.
+  - **Filter** (`synth.py filter`, Qwen3-0.6B, own passage in the top 10 among the task's passages):
+    - Kept 6,382 of 7,989 rows.
+    - SynthCounterArgument: 3,742 / 3,992 kept, median rank 1, top-1 71%.
+    - SynthArgument: 2,640 / 3,997 kept, median rank 4. Generic debate questions that many speeches answer are dropped.
+  - **Stance-flipped negatives** (`synth.py negatives`): for up to 1,600 counter-argument rows (Claude part 0, Codex
+    part 1), a new passage on the same topic with the same key terms and parliamentary register that *agrees* with
+    the argument. The prompt has the generator state the argument's premise and its strategy before writing.
+  - **Attach** (`synth.py attach`): the negatives become a `gen_negatives` column, are checked against test documents,
+    and `rescore.py` puts them first, exempt from the 95% guard.
+  - **Smoke test:** the Qwen3-0.6B teacher scores the agreeing passage *above* the real rebuttal in 31 of 32 rows. That
+    is the confusion B targets, and why the guard can't be applied to these negatives.

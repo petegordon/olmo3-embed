@@ -46,6 +46,10 @@ RAW = os.environ.get("OLMO3_RAW", "data/raw")
 INSTRUCTIONS.update({  # task-variety sources (teacher prompts only; training uses no instructions)
     "StackExchange": "Given a question title from a Q&A forum, retrieve the full question post",
     "S2ORCCitation": "Given the title of a scientific paper, retrieve the titles of papers it cites",
+    "SynthArgument": "Given a debate question, retrieve speeches that argue for or against it",
+    "SynthCounterArgument": "Given an argument, retrieve the speech that rebuts it",
+    "SynthEntitySearch": "Given a keyword search, retrieve the description of the entity it refers to",
+    "SynthClimateClaim": "Given a claim about the climate or environment, retrieve passages that support or refute it",
 })
 DEFAULT_INSTRUCTION = "Given a query, retrieve relevant documents"
 
@@ -184,6 +188,12 @@ def main():
             pool.setdefault(task, []).extend(d.text.tolist())
     df = mine(df, model, args.batch_size, pool=pool)
     df["negatives"] = df.negatives.map(lambda n: n[: args.max_cands])  # mined lists are rank-ordered: ranks 10-39
+    # Generated hard negatives (synth.py negatives, e.g. stance-flipped passages): known negatives by construction, so
+    # they skip the guard entirely. The teacher can't judge them: Qwen3-0.6B scores a passage that AGREES with an
+    # argument above the real rebuttal in 31 of 32 smoke-test rows, which is exactly what they're meant to teach.
+    gen = [set(G) for G in df["gen_negatives"]] if "gen_negatives" in df else [set()] * len(df)
+    if "gen_negatives" in df:
+        df["negatives"] = [list(dict.fromkeys(list(G) + list(N))) for G, N in zip(df.gen_negatives, df.negatives)]
     docs = list(dict.fromkeys(d for col in ("positives", "negatives") for L in df[col] for d in L))
     doc_id = {d: i for i, d in enumerate(docs)}
     print(f"unique docs {len(docs):,}", flush=True)
@@ -198,7 +208,8 @@ def main():
         ps = float((de[[doc_id[p] for p in P]].astype(np.float32) @ q).max())
         if N:
             cs = de[[doc_id[n] for n in N]].astype(np.float32) @ q
-            keep = cs <= args.guard * ps
+            is_gen = np.array([n in gen[i] for n in N])
+            keep = is_gen | (cs <= args.guard * ps)
             o = np.argsort(-cs[keep])
             negs.append([N[j] for j in np.flatnonzero(keep)[o]])
             neg_scores.append(cs[keep][o].round(4).tolist())
