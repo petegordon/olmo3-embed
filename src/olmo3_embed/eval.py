@@ -21,9 +21,10 @@ SUITES = {
         "NanoTouche2020Retrieval",
     ],
     # Held-out task shapes at full query count (Nano has ~50 queries/task: too noisy for +1-point data changes).
-    # ClimateFEVER/DBPedia use MTEB's HardNegatives corpora (same queries/labels, top-250 candidates per query).
+    # ClimateFEVER/DBPedia use MTEB's HardNegatives corpora (same queries/labels, top-250 candidates per query); .v2
+    # only adds a query prompt (v1 has none), so instruction-free models score the same on v1 and v2.
     # Touche2020 has only 49 test queries even in full, so it stays on Nano.
-    "heldout": ["ArguAna", "SCIDOCS", "ClimateFEVERHardNegatives", "DBPediaHardNegatives"],
+    "heldout": ["ArguAna", "SCIDOCS", "ClimateFEVERHardNegatives.v2", "DBPediaHardNegatives.v2"],
     "beir": None,  # full 15-task benchmark (Colab)
 }
 

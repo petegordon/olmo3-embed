@@ -22,6 +22,7 @@ Resume: rerun the same command; it continues from ckpt/ if present.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import os
@@ -48,6 +49,7 @@ class Config:
     instructions: bool = True
     instruction_mode: str = "fixed"  # fixed: `instruction` for every query | per_task: the MTEB task prompt eval uses
     instruction: str = "Given a web search query, retrieve relevant passages that answer the query"
+    instruction_dropout: float = 0.0  # share of queries trained without their instruction (eval always uses it)
     # multi-task data (Phase 3 Track B parquet: query, positives[], negatives[] hardest-first, task)
     task_batching: bool = False  # every batch from one task, tasks sampled with temperature (plan §5)
     task_temperature: float = 0.5  # rows per task ∝ n_task ** T (1 = proportional, 0 = uniform)
@@ -167,13 +169,29 @@ def false_negative_mask(batch: list[dict], k: int) -> torch.Tensor:
 
 
 def query_text(r: dict, cfg: Config) -> str:
-    if not cfg.instructions:
+    if not cfg.instructions or dropped_instruction(r["query"], cfg.instruction_dropout):
         return r["query"]
     instr = task_instruction(r["task"]) if cfg.instruction_mode == "per_task" else cfg.instruction
     return INSTRUCTION_TEMPLATE.format(instruction=instr, text=r["query"])
 
 
-_INSTR: dict[str, str] = {}
+def dropped_instruction(query: str, p: float) -> bool:
+    """Instruction dropout: this query trains without its instruction, so the model can't lean on the prefix alone.
+    Decided by a hash of the query text (stable across resumes; each query is seen about once per run)."""
+    return p > 0 and int(hashlib.md5(query.encode("utf-8")).hexdigest()[:8], 16) / 0xFFFFFFFF < p
+
+
+# Training tasks that aren't MTEB tasks (task-variety sources): our own instructions, written in MTEB's style
+# for the task shape, not copied from the held-out test tasks.
+EXTRA_INSTRUCTIONS = {
+    "StackExchange": "Given a question title from a Q&A forum, retrieve the full question post",
+    "S2ORCCitation": "Given the title of a scientific paper, retrieve the titles of papers it cites",
+    "SynthArgument": "Given a debate question, retrieve speeches that argue for or against it",
+    "SynthCounterArgument": "Given an argument, retrieve the speech that rebuts it",
+    "SynthEntitySearch": "Given a keyword search, retrieve the description of the entity it refers to",
+    "SynthClimateClaim": "Given a claim about the climate or environment, retrieve passages that support or refute it",
+}
+_INSTR: dict[str, str] = dict(EXTRA_INSTRUCTIONS)
 
 
 def task_instruction(task: str) -> str:

@@ -75,7 +75,9 @@ def main():
                 vals = [v for (m, t), v in ours.items() if m == model and t in group]
                 if len(vals) == len(group):
                     print(f"  {'NanoBEIR ' + label:<28}{sum(vals) / len(vals):8.2f}")
-        full = [v for (m, t), v in ours.items() if m == model and t in HELD_OUT_FULL]
+        # .v2 HardNegatives only add a query prompt: same score for instruction-free models, so either counts (v2 wins)
+        full = [ours.get((model, t + ".v2"), ours.get((model, t))) for t in sorted(HELD_OUT_FULL)]
+        full = [v for v in full if v is not None]
         if len(full) == len(HELD_OUT_FULL):
             print(f"  {'heldout-4 (full size)':<28}{sum(full) / len(full):8.2f}")
     print(f"\n{'PASS' if not fails else f'{fails} task(s) outside ±{args.tol}'}")
