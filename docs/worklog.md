@@ -20,9 +20,9 @@ timestamps, so they include waiting and debugging, not just compute. Scores are 
 | 2. Recipe ablations (1B) | Oct 4, 20:12 – Oct 5, 04:20 | ~8 h (overnight) | ~16 | EOS pooling + no instructions: 57.51 avg-12 (from 16) |
 | 3. Track B data + proxy runs | Oct 5, 04:43 – Oct 6, 13:20 | ~32 h, incl. a ~14 h pause | ~47 | B3: 62.28 avg-13, 49.35 held-out; gate passed |
 | 4. 7B run #1 | Oct 6, 13:33–21:53 | ~8.5 h | ~55 | 65.93 avg-13: level with Qwen3-4B in-domain, −9.7 held-out |
-| 5. Task variety (in progress) | Oct 6, 21:39 → | ~21 h so far | ~46 so far | Full-size held-out eval: V1 +1.20 (kept), V2 +0.66, V3 +0.59, V3b +0.27; Nano was too noisy to see it |
+| 5. Task variety (1B proxy done) | Oct 6, 21:39 – Oct 7, 21:08 | ~23.5 h | ~56 | Full-size held-out: V1 +1.20, V2 +0.66, V3 +0.59, V3b +0.27, V4 (all) +0.92: gains don't stack at 64k; carry V1 + V2 to 7B run #2 |
 
-**Total so far:** about 3.2 days of calendar time and ~168 Colab units. About 214 units are left.
+**Total so far:** about 3.3 days of calendar time and ~178 Colab units. About 204 units are left.
 
 ---
 
@@ -148,6 +148,7 @@ excluded for unclear reuse terms).
 | Full-size held-out suite + Wikipedia mining pool (`synth.py pool`, `rescore.py --pool`) | 13:20–14:05 | ~45 min | pools: 500k entity leads, 223k climate paragraphs |
 | **Full-size held-out eval of B3, V1, V2, V3** | ~15:00–16:03 | **~12 min each** | V1 37.86 (+1.20 vs B3's 36.66): first source to clear the bar; V2 +0.66, V3 +0.59 |
 | **V3b proxy run** (V3 + pool negatives) | 16:03–18:25 | ~2.4 h (mining ~25 min, training ~1.4 h, both evals) | 36.93: no better than V3; dropped. Session ~18 units |
+| **V4 proxy run** (V1 + V2 + V3 combined) | 19:13–21:08 | ~1.9 h (training 492 steps ~1.5 h, Nano 7 min, held-out 12 min) | heldout-4 37.58 (+0.92): below V1 alone; best ArguAna (56.0) and best Nano avg-13 (62.35); ~10 units |
 
 **Iterations:**
 - StackExchange's stackoverflow file is 7.8 GB → streaming with reservoir sampling.
@@ -179,9 +180,12 @@ excluded for unclear reuse terms).
   +1.20 (Nano said +0.61) and V2 helping ArguAna by +2.65 (Nano said 0). Use it for every proxy run from now on.
 - **Harder negatives aren't enough on their own:** a 500k-doc Wikipedia mining pool made V3's batches harder but didn't
   improve DBPedia.
+- **Combining sources at a fixed budget dilutes them (V4).** The held-out gains overlap on ArguAna instead of adding
+  up, and the Wikipedia-style tasks (ClimateFEVER, DBPedia, FEVER) lose ground as Track B's share shrinks. The fix is
+  a bigger budget, not fewer sources.
 - **Iterations:** pool build ran out of memory (exploding paragraphs copied each article's text onto every row); the
   doc-decontam index only unpickled when its own script ran (`__main__.DocIndex`); Chrome disconnected, so Pete ran
-  Run all and granted access.
+  Run all and granted access. On V4's restart one of my clicks added an empty text cell; deleted before rerunning.
 - **Generators:** Claude and Codex are fast enough for pilot volumes (~2,000 queries per shape in a few hours); Gemini
   via Antigravity is several times slower; Codex is bounded by its usage window.
 - **Storage:** Pete is considering making Google Drive the shared store between the Windows laptop, the Mac (Colab CLI)

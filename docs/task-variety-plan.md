@@ -253,3 +253,32 @@ closer. Entity batches still trained at 96–99% accuracy, though.
 - **Drop the V3b pool mining** (no gain for its cost).
 - **Next, V4:** V1 + V2 + V3 together at the same 64k budget, to see whether the held-out gains add up. Then 7B run #2
   with the kept sources, ideally at a larger budget so the in-domain tasks don't lose their share.
+
+### V4: V1 + V2 + V3 combined (p5-v4, 2026-10-07)
+Track B v1 + V1 + V2 + V3 (all own-pool rescored) at B3's recipe and 64k-row budget
+(`notebooks/variety_v4_colab.ipynb`). About 1.9 h on an A100 40GB (~10 units) for training and both evals.
+
+| | B3 | V1 | V2 | V3 | **V4** |
+|---|---|---|---|---|---|
+| ArguAna (full) | 52.42 | 54.94 | 55.07 | 53.98 | **56.00** |
+| SCIDOCS (full) | 19.54 | **20.72** | 19.22 | 19.52 | 20.45 |
+| ClimateFEVER-HN | 32.26 | **32.90** | 32.24 | 32.83 | 31.84 |
+| DBPedia-HN | 42.41 | **42.88** | 42.74 | 42.69 | 42.03 |
+| **heldout-4 (full size)** | **36.66** | **37.86** | **37.32** | **37.25** | **37.58 (+0.92)** |
+| Nano avg-OOD-5 | 49.35 | 49.96 | 49.48 | 49.47 | **50.39** |
+| Nano avg-in-8 | 70.36 | 69.54 | 70.07 | 70.00 | 69.83 |
+| Nano avg-13 | 62.28 | 62.01 | 62.15 | 62.10 | **62.35** |
+
+**Reading it:**
+- **The gains don't stack at a fixed budget.** V4 is +0.92 on heldout-4, below V1 alone (+1.20). Its gains are the
+  best ArguAna yet (+3.6, where V1's and V2's argument-shaped data overlap) and V1's SCIDOCS gain, mostly kept.
+- **ClimateFEVER and DBPedia fall below B3.** With four sources sharing the 64k rows, Track B's FEVER/HotpotQA/NQ rows
+  get fewer steps, and FEVER drops 3.1 on Nano. Those are the Wikipedia tasks closest to ClimateFEVER/DBPedia.
+- **Nano agrees on direction but not on size.** V4 has the best Nano avg-OOD-5 (50.39) and avg-13 (62.35), but only
+  the full-size eval separates V1 from V4.
+
+**What carries to 7B run #2:**
+- **Sources:** Track B v1 + V1 (StackExchange + S2ORC) + V2 (synthetic argument + counter-argument). V3 is
+  dropped: no full-size gain on its targets, and it costs FEVER-style steps.
+- **Budget:** more than 64k rows, so the added sources come *on top of* Track B's share instead of out of it. Every
+  variant cost avg-in-8 at a fixed 64k, and the 7B's in-domain lead is the asset to keep.
