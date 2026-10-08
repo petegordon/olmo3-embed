@@ -332,3 +332,30 @@ Pushed 23:37 (Windows instance's browser runtime, ~1.85 h, ~10 units). Compared 
   (same documents and qrels). So ClimateFEVER −1.10 / DBPedia +1.94 mix the instruction effect with the prompt.
 - **Verdict:** not adopted on its own merit. It costs nothing at inference, so it can ride along in 7B run #2 if B
   doesn't win outright; at 7B scale the gain may differ either way.
+
+### A result: instructions + 20% dropout (p5-v2i, 2026-10-07)
+About 2 h on an A100 40GB (~10 units), training and both evals.
+
+| | p5-v2 (no instructions) | **p5-v2i (instructions, 20% dropout)** | Δ |
+|---|---|---|---|
+| ArguAna (full) | 55.07 | 56.11 | +1.04 |
+| SCIDOCS (full) | 19.22 | 19.73 | +0.51 |
+| ClimateFEVER-HN (v2 prompt for v2i) | 32.24 | 31.14 | −1.10 |
+| DBPedia-HN (v2 prompt for v2i) | 42.74 | 44.68 | +1.94 |
+| **heldout-4 (full size)** | **37.32** | **37.92** | **+0.60** |
+| Nano avg-OOD-5 | 49.48 | 50.88 | +1.40 |
+| **Nano avg-in-8** | **70.07** | **70.70** | **+0.63** |
+| Nano avg-13 | 62.15 | **63.08** | +0.93 |
+
+**Reading it:**
+- **Phase 3's instruction penalty (B2: −4.6) is gone.** With task-shaped training data and dropout, instructions are
+  positive on held-out (+0.60 heldout-4, +1.40 Nano) *and* in-domain (+0.63 avg-in-8).
+  - **Best proxy so far on Nano avg-13** (63.08; MSMARCO +5.0).
+  - **Best on DBPedia-HN.** Its `.v2` prompt names DBPedia entity descriptions, and our training has no entity task
+    at all.
+- **ClimateFEVER-HN −1.1:** the only loss. Its `.v2` prompt ("claim about climate change ... support or refute") is
+  close to FEVER's, so it isn't an unfamiliar instruction. Possibly noise (1,000 queries), possibly a cost of the
+  prompt.
+- heldout-4's +0.60 is under the +1 keep bar on its own, but nothing else got held-out *and* in-domain to rise together.
+- **Decision:** **keep instructions (per-task, 20% dropout) for 7B run #2.** Instruction-tuned 7B models (E5-Mistral,
+  Qwen3, NV-Embed) benefit more from instructions than a 1B LoRA does, and this result no longer argues against them.

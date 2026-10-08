@@ -20,9 +20,9 @@ timestamps, so they include waiting and debugging, not just compute. Scores are 
 | 2. Recipe ablations (1B) | Oct 4, 20:12 – Oct 5, 04:20 | ~8 h (overnight) | ~16 | EOS pooling + no instructions: 57.51 avg-12 (from 16) |
 | 3. Track B data + proxy runs | Oct 5, 04:43 – Oct 6, 13:20 | ~32 h, incl. a ~14 h pause | ~47 | B3: 62.28 avg-13, 49.35 held-out; gate passed |
 | 4. 7B run #1 | Oct 6, 13:33–21:53 | ~8.5 h | ~55 | 65.93 avg-13: level with Qwen3-4B in-domain, −9.7 held-out |
-| 5. Task variety (A and B running) | Oct 6, 21:39 → | ~24.5 h so far | ~56 so far | Full-size held-out: V1 +1.20, V2 +0.66, V3 +0.59, V3b +0.27, V4 (all) +0.92: gains don't stack at 64k; carry V1 + V2 to 7B run #2 |
+| 5. Task variety (A done, B in progress) | Oct 6, 21:39 → | ~26 h so far | ~66 so far | Full-size held-out: V1 +1.20, V2 +0.66, V3 +0.59, V3b +0.27, V4 (all) +0.92: gains don't stack at 64k; carry V1 + V2 to 7B run #2 |
 
-**Total so far:** about 3.3 days of calendar time and ~178 Colab units. About 204 units are left.
+**Total so far:** about 3.4 days of calendar time and ~188 Colab units. About 193 units are left.
 
 ---
 
@@ -152,6 +152,8 @@ excluded for unclear reuse terms).
 | Outside review of the pipeline → experiments A (instructions + dropout) and B (filter + stance negatives) | 21:15–21:35 | ~20 min | kept 3 ideas, rejected 4 with reasons (task-variety plan) |
 | A: `instruction_dropout`, instructions for new tasks, held-out suite on `.v2` tasks; launch `p5-v2i` | 21:35–21:47 | ~12 min + Colab | training from 21:47 |
 | B: round-trip filter (laptop GPU), stance-negative generator, attach, rescore support | 21:40–22:05 | ~25 min | filter kept 6,382 / 7,989; Claude + Codex generating 1,600 negatives |
+| **A result (`p5-v2i`)** | 21:47–23:37 | ~1.9 h, ~10 units | heldout-4 37.92 (+0.60 vs p5-v2), Nano avg-in-8 70.70 (+0.63), avg-13 63.08 (best proxy yet): instructions kept for 7B run #2 |
+| Hand-off prompt for a Mac Claude Code instance (Colab CLI); B notebook `variety_b_stance_colab.ipynb` | 22:30 | ~15 min | Mac runs B once release `data-variety-v2b` exists |
 | **A result (p5-v2i)** | 21:47–23:37 | ~1.85 h Colab (browser) | heldout-4 37.92 (**+0.60 vs p5-v2**, below the bar); Nano avg-in-8 70.70 (+0.63), avg-OOD-5 50.88 (+1.40); instructions no longer hurt; ~10 units |
 
 **Iterations:**
@@ -187,6 +189,9 @@ excluded for unclear reuse terms).
 - **Combining sources at a fixed budget dilutes them (V4).** The held-out gains overlap on ArguAna instead of adding
   up, and the Wikipedia-style tasks (ClimateFEVER, DBPedia, FEVER) lose ground as Track B's share shrinks. The fix is
   a bigger budget, not fewer sources.
+- **Instructions flipped from −4.6 (Phase 3, 8 search-like tasks) to positive (+0.6 held-out, +0.6 in-domain)** once
+  the training data had task shapes that differ in what "relevant" means, and with 20% instruction dropout. An early
+  negative result was specific to its data, not general.
 - **The teacher can't see stance.** Qwen3-0.6B ranks a passage that agrees with an argument above the real rebuttal in
   31 of 32 rows, so guard rules built on the teacher would have thrown away every stance negative. That's also the
   clearest picture yet of why ArguAna is hard for similarity-trained embedders.
