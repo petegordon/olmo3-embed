@@ -291,11 +291,17 @@ wait, 24 s before Pete's "done". `colab upload` paths are relative to `/`, and t
 | NanoBEIR avg (13) | 65.93 | 66.08 |
 | avg-in-8 | 75.65 | 75.67 |
 | avg-OOD-5 | 50.37 | 50.73 |
-| heldout-4, full size | (not run) | 42.13 |
-| ArguAna / SCIDOCS (full) | | 60.45 / 23.81 |
+| heldout-4, full size | 40.14 | **42.13** (+1.99) |
+| ArguAna (full) | 57.57 | 60.45 (+2.88) |
+| SCIDOCS (full) | 21.96 | 23.81 (+1.85) |
+| ClimateFEVER HardNeg (full) | 34.62 | 34.44 (−0.18) |
+| DBPedia HardNeg (full) | 46.42 | 49.81 (+3.39) |
 
-Nano moves are within noise (+0.15 avg). The full-size held-out score has no 7B baseline yet (the 1B proxies score
-36.7–37.9). Run #1's full held-out eval would make the comparison.
+Nano moves are within noise (+0.15 avg). **On the full-size held-out tasks, run #2 is +1.99** (3 of 4 tasks up, the
+fourth flat). These tasks have hundreds to thousands of queries each, so this is the signal Nano couldn't give. Run #1's
+held-out eval ran Oct 9, 10:41–11:36 (eval only, ~6.2 units). Caveat: run #2 changed the data (+ V1 + V2) and added
+per-task instructions at once, so the gain is the recipe's, not the data's alone. On the 1B proxy, both moved held-out
+by similar amounts (V1 +1.20, V2 +0.66, instructions +0.60 on heldout-4).
 
 **Learned:** headless Colab works end to end and needs no tab, but each runtime still costs one human consent click
 for Drive. The HF storage plan (`docs/colab-hf-storage-plan.md`) would remove that: an HF token goes up like the GitHub
