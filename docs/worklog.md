@@ -303,6 +303,26 @@ held-out eval ran Oct 9, 10:41–11:36 (eval only, ~6.2 units). Caveat: run #2 c
 per-task instructions at once, so the gain is the recipe's, not the data's alone. On the 1B proxy, both moved held-out
 by similar amounts (V1 +1.20, V2 +0.66, instructions +0.60 on heldout-4).
 
+**Run #2 on 8 BEIR tasks (Oct 9, 13:06–17:51, ~32 units):** full BEIR-15 is out of budget. Measured throughput is
+~35–50k chars/s for the 7B on an A100, and BEIR-15 is ~14B chars (33M docs) → ~80–100 A100-h ≈ 550–700 units. The
+plan's 6–12 GPU-h was ~10× low. Instead: the 8 tasks with small or medium corpora (ArguAna, SCIDOCS + NFCorpus, SciFact, FiQA,
+Quora, TREC-COVID, CQADupstack), ranked against the 139 15-task models in `docs/beir_snapshot_2026-10-04.csv`.
+
+| | ArguAna | SCIDOCS | NFCorpus | SciFact | FiQA | Quora | TREC-COVID | CQADup | 8-avg | BEIR-15 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| **run #2** | 60.5 | 23.8 | 39.7 | 79.5 | 52.9 | 89.8 | 65.9 | 46.2 | **57.27** | ~55 (est.) |
+| LLM2Vec-Llama-3-8B (T1) | 62.8 | 23.0 | 41.8 | 78.2 | 55.3 | 87.2 | 80.3 | 48.2 | 59.61 | 56.6 |
+| Qwen3-Embedding-0.6B | 71.0 | 24.4 | 36.7 | 69.7 | 46.6 | 87.8 | 90.5 | 46.0 | 59.09 | 55.5 |
+| Qwen3-Embedding-4B | 75.6 | 31.4 | 41.1 | 78.3 | 62.6 | 88.1 | 92.9 | 50.3 | 65.05 | 61.6 |
+
+- **Rank 30 of 139 on the 8-task average.**
+- **BEIR-15 estimate ~55 (rank ~33), so T1 (56.6) is probably ~1.5 short.** Two methods agree: (a) the 8-avg →
+  BEIR-15 fit across the 139 models (R² 0.98, residual sd 2.0) gives 55.1; (b) the 8 measured tasks plus the other 7
+  projected from our NanoBEIR deltas vs the Qwen3 references give 54.7. On the 6 measured tasks, (b) was within
+  ~2 points except ArguAna (+8, Nano overstates).
+- **Biggest gaps:** TREC-COVID (−14 vs LLM2Vec, −25 vs Qwen3-4B) and, by projection, Touche and ClimateFEVER.
+  In-domain (NQ, HotpotQA, FEVER) projects at or above Qwen3-4B.
+
 **Learned:** headless Colab works end to end and needs no tab, but each runtime still costs one human consent click
 for Drive. The HF storage plan (`docs/colab-hf-storage-plan.md`) would remove that: an HF token goes up like the GitHub
 token, with no consent.
