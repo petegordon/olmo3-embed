@@ -271,6 +271,32 @@ wait, 24 s before Pete's "done". `colab upload` paths are relative to `/`, and t
 - **Pausing for a disconnect:** wait for the next checkpoint (every 10 steps ≈ 8 min) to land in the Mac's Drive
   copy, then `colab stop`. Done at step 410 with nothing lost.
 
+**7B run #2, session 2 (Oct 8, 20:04 – Oct 9, 10:18): finished and pushed.**
+- **Resume from step 410 worked:** a new runtime plus one Drive consent, and the train cell printed "resumed from step 410/743".
+- **I lost a runtime to a `--timeout` change** (~8 units). I raised `colab exec --timeout` from 3600 to 36000 so the
+  training cell wouldn't time out. But the CLI's client sleeps on one event until a message arrives or the deadline
+  passes, and only then checks the connection. The websocket dropped at 22:26, and the client didn't notice until 06:12.
+  Training ran on to a step 610 checkpoint (22:45), and then Colab reclaimed the runtime (with no client, after ~20 min).
+- **A short `--timeout` isn't the fix either:** once the deadline passes, the reply wait gets 0 s, so any cell longer
+  than the timeout fails with "Timeout waiting for reply". With 60 s, setup cell 1 failed on four attempts in a row.
+- **Fix: `scripts/colab_exec_watch.py`** runs `colab exec` with each internal wait capped at 30 s, so a long
+  `--timeout` (36000) still notices a dropped connection within about 30 s, and the driver can re-exec. It ran
+  610 → 743 plus both evals (07:18–10:18) with no drop to test it on, and a 70 s smoke cell used almost no CPU.
+- **Cost:** session 2 was ~38.7 units (135.03 → 96.29), so run #2 came to ~78 units, within the ~95 approved.
+
+**Run #2 result** (Nano = NanoBEIR nDCG@10, max 512 tokens; raw results on `colab-results`):
+
+| | run #1 | run #2 |
+|---|---|---|
+| NanoBEIR avg (13) | 65.93 | 66.08 |
+| avg-in-8 | 75.65 | 75.67 |
+| avg-OOD-5 | 50.37 | 50.73 |
+| heldout-4, full size | (not run) | 42.13 |
+| ArguAna / SCIDOCS (full) | | 60.45 / 23.81 |
+
+Nano moves are within noise (+0.15 avg). The full-size held-out score has no 7B baseline yet (the 1B proxies score
+36.7–37.9). Run #1's full held-out eval would make the comparison.
+
 **Learned:** headless Colab works end to end and needs no tab, but each runtime still costs one human consent click
 for Drive. The HF storage plan (`docs/colab-hf-storage-plan.md`) would remove that: an HF token goes up like the GitHub
 token, with no consent.
