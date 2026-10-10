@@ -191,6 +191,7 @@ EXTRA_INSTRUCTIONS = {
     "SynthEntitySearch": "Given a keyword search, retrieve the description of the entity it refers to",
     "SynthClimateClaim": "Given a claim about the climate or environment, retrieve passages that support or refute it",
     "PubMedQA": "Given a biomedical research question, retrieve the abstract of the study that answers it",
+    "S2Search": "Given a scientific literature search query, retrieve the paper the searcher was looking for",
 }
 _INSTR: dict[str, str] = dict(EXTRA_INSTRUCTIONS)
 

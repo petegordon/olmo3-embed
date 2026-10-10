@@ -11,8 +11,8 @@ entities, scientific abstracts) also put test-corpus *documents* at risk, so pas
                            Jaccard >= 0.8) a test-qrel POSITIVE document of any of the 39 test sets. This also covers
                            the Wikipedia-based tasks (ClimateFEVER, DBPedia, FEVER, HotpotQA, NQ), whose corpora are too
                            large to index whole and are shared with standard training data anyway.
-  doc_near                 passage near-duplicates (same MinHash rule) ANY document of the biomedical full corpora:
-                           TREC-COVID (CORD-19, 171k), NFCorpus, SciFact. Catches the same abstract with different
+  doc_near                 passage near-duplicates (same MinHash rule) ANY document of the NEAR_FULL corpora:
+                           TREC-COVID (CORD-19, 171k), NFCorpus, SciFact, SCIDOCS. Catches the same abstract with different
                            formatting or a truncated/extended version (Phase 6: PubMed sources vs CORD-19).
   doc_contain              >= CONTAIN (5%) of the passage's word 8-grams occur anywhere in a NEAR_FULL corpus. Needed
                            because CORD-19 stores "title + section label + abstract" while PubMed sources carry the bare
@@ -41,7 +41,9 @@ from huggingface_hub import HfApi
 from olmo3_embed.data.decontam import CACHE, h, iter_records, load_test, norm, rid, shingles, test_tasks
 
 FULL_CORPUS = {"Touche2020", "ArguAna", "SCIDOCS", "NFCorpus", "SciFact", "FiQA2018", "TRECCOVID", "QuoraRetrieval"}
-NEAR_FULL = {"TRECCOVID", "NFCorpus", "SciFact"}  # every corpus doc gets the near-duplicate check, not just positives
+# Every corpus doc of these gets the near-duplicate and containment checks, not just positives: the PubMed-derived
+# corpora (Phase 6 PubMedQA) and SCIDOCS (Semantic Scholar papers, the same source as S2ORC / SciRepEval search).
+NEAR_FULL = {"TRECCOVID", "NFCorpus", "SciFact", "SCIDOCS"}
 PREFIX, NEAR_CHARS, NUM_PERM, JACCARD = 200, 300, 128, 0.8
 CONTAIN_N, CONTAIN = 8, 0.05
 INDEX = os.path.join(CACHE, "doc_index_v2.pkl")  # v2: + doc_near over NEAR_FULL corpora
@@ -205,13 +207,14 @@ def main():
         return
     idx = idx or load()
     df = pd.read_parquet(args.check)
-    hits, keep, cleaned_negs = collections.Counter(), [], []
+    hits, keep, cleaned_negs, cleaned_scores = collections.Counter(), [], [], []
+    has_scores = "neg_scores" in df.columns  # rescored files: per-negative scores, kept aligned with negatives
     for i, r in enumerate(df.itertuples(index=False)):
         bad_pos = False
         for col in args.columns:
             vals = getattr(r, col)
             vals = [vals] if isinstance(vals, str) else list(vals)
-            ok = []
+            ok, mask = [], []
             for v in vals:
                 hit = idx.check(v)
                 if hit:
@@ -219,15 +222,23 @@ def main():
                     bad_pos |= col.startswith("pos")
                 else:
                     ok.append(v)
+                mask.append(not hit)
             if col == "negatives":
                 cleaned_negs.append(ok)
+                if has_scores:
+                    sc = list(r.neg_scores) if r.neg_scores is not None else []
+                    cleaned_scores.append([x for x, m in zip(sc, mask) if m] if len(sc) == len(mask) else sc)
         keep.append(not bad_pos)
+        if (i + 1) % 50_000 == 0:
+            print(f"  checked {i + 1} rows", flush=True)
     for (col, rule, task), n in sorted(hits.items()):
         print(f"  {col:<10} {rule:<11} {task:<32} {n}")
     print(f"rows {len(df)}; rows with a flagged positive {keep.count(False)}")
     if args.out:
         if "negatives" in args.columns:
             df = df.assign(negatives=cleaned_negs)
+            if has_scores:
+                df = df.assign(neg_scores=cleaned_scores)
         df[keep].to_parquet(args.out, index=False, row_group_size=20_000)
         with open(args.out + ".doc_decontam.json", "w", encoding="utf-8") as f:
             json.dump({"rows_in": len(df), "rows_out": int(sum(keep)),

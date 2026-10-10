@@ -2,6 +2,7 @@
 
     python -m olmo3_embed.data.build_variety [--per-site 1000] [--s2orc 60000] [--out data/variety_v1]
     python -m olmo3_embed.data.build_variety --sources pubmedqa --pubmedqa 30000 --out data/variety_bio
+    python -m olmo3_embed.data.build_variety --sources s2search --s2search 30000 --out data/variety_s2search
 
   StackExchange  flax-sentence-embeddings/stackexchange_title_body_jsonl (CC BY-SA 4.0): question title -> title+body.
                  Every site EXCEPT the 12 CQADupStack test forums and money (FiQA-2018's source: decontam found 44
@@ -13,6 +14,9 @@
                  (generated from the paper's title) -> that paper's PubMed abstract (context paragraphs + conclusion).
                  One row per PubMed id, --pubmedqa rows sampled. Zero-shot protocol: no TREC-COVID queries, qrels or
                  CORD-19 documents; doc_decontam.py drops any abstract matching TREC-COVID/NFCorpus/SciFact corpus docs.
+  S2Search       allenai/scirepeval search train (ODC-BY; Phase 6 fallback source): real Semantic Scholar search queries
+                 -> the clicked paper (title + abstract). Pasted-title queries are dropped (query words mostly inside
+                 the clicked title), keeping short keyword searches, TREC-COVID's query shape. One row per query.
 
 Output <out>/ingested.parquet in Track B's schema (qid, task, source, query, positives, negatives=[]). Then, as for
 Track B: decontam.py --docs (queries), doc_decontam.py --check (passages), rescore.py (negatives mined within each
@@ -140,12 +144,49 @@ def ingest_pubmedqa(n: int, seed: int, stats: dict) -> list[dict]:
     return rows
 
 
+def ingest_s2search(n: int, seed: int, stats: dict, max_words: int = 12, max_title_overlap: float = 0.6) -> list[dict]:
+    ds = load_dataset("allenai/scirepeval", "search", split="train", streaming=True)
+    rows, seen = [], set()
+    for i, r in enumerate(ds.shuffle(seed=seed, buffer_size=100_000)):
+        st = stats["s2search"]
+        st["scanned"] += 1
+        q = (r.get("query") or "").strip()
+        cands = r.get("candidates") or []
+        cands = json.loads(cands) if isinstance(cands, str) else cands
+        pos = [c for c in cands if (c.get("score") or 0) > 0 and (c.get("abstract") or "").strip()]
+        nq = norm(q)
+        if not nq or not pos or nq in seen:
+            st["skipped_no_click_or_dup"] += 1
+            continue
+        qw = set(nq.split())
+        if len(qw) > max_words:
+            st["skipped_long_query"] += 1
+            continue
+        title_w = set(norm(pos[0].get("title") or "").split())
+        if len(qw & title_w) / len(qw) > max_title_overlap:  # a pasted title, not a search
+            st["skipped_title_query"] += 1
+            continue
+        docs = [f"{(c.get('title') or '').strip()} {(c.get('abstract') or '').strip()}".strip() for c in pos]
+        docs = [d for d in docs if len(d) >= 200]
+        if not docs:
+            st["skipped_short_doc"] += 1
+            continue
+        seen.add(nq)
+        rows.append({"qid": f"S2Search:{i}", "task": "S2Search", "source": "allenai/scirepeval/search",
+                     "query": q, "positives": docs, "negatives": []})
+        if len(rows) >= n:
+            break
+    stats["s2search"]["rows"] = len(rows)
+    return rows
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--per-site", type=int, default=1000)
     ap.add_argument("--s2orc", type=int, default=60_000)
     ap.add_argument("--pubmedqa", type=int, default=30_000)
-    ap.add_argument("--sources", default="stackexchange,s2orc", help="comma list of stackexchange, s2orc, pubmedqa")
+    ap.add_argument("--s2search", type=int, default=30_000)
+    ap.add_argument("--sources", default="stackexchange,s2orc", help="comma list of stackexchange, s2orc, pubmedqa, s2search")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", default="data/variety_v1")
     args = ap.parse_args()
@@ -158,6 +199,8 @@ def main():
         rows += ingest_s2orc(args.s2orc, args.seed, stats)
     if "pubmedqa" in src:
         rows += ingest_pubmedqa(args.pubmedqa, args.seed, stats)
+    if "s2search" in src:
+        rows += ingest_s2search(args.s2search, args.seed, stats)
     os.makedirs(args.out, exist_ok=True)
     df = pd.DataFrame(rows)
     df.to_parquet(f"{args.out}/ingested.parquet", index=False, row_group_size=20_000)
