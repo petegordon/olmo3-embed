@@ -5,6 +5,9 @@ what each phase scored. **This file is the running diary:** each step in order, 
 iterations it took to get there (bugs, retries, wrong turns), and what we learned. Newest phase at the bottom; I append
 to it as work happens.
 
+Terms and concepts explained along the way (Olmo-core vs OLMo, causal attention, post-training, ...) live in
+[`docs/petes-learning.md`](petes-learning.md).
+
 Times are laptop local time. Colab pushes are stamped in UTC and converted here. Durations come from commit and push
 timestamps, so they include waiting and debugging, not just compute. Scores are NanoBEIR nDCG@10 (×100):
 **avg-13** = all 13 tasks, **avg-in-8** = the 8 task types we train on, **avg-OOD-5** = the 5 held-out task types
