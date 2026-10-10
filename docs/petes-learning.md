@@ -239,8 +239,20 @@ contrastive stage on public data. That's our recipe's shape. The ~7-point gap is
 hard-negative quality, task instructions, few-shot examples), not a missing stage.
 
 **What "ICL" means:** in-context learning. bge-en-icl can take a few example query–document pairs in front of the
-query, the way you'd give an LLM examples in a prompt. It's trained with these examples so it learns to use them. Check
-whether a leaderboard score was run with or without them.
+query, the way you'd give an LLM examples in a prompt. It's trained with these examples so it learns to use them.
+
+**Checked (Oct 10): the leaderboard's 62.16 is the few-shot score.**
+
+- The MTEB results repo stores bge-en-icl's BEIR scores under revision `external`. That means BAAI reported them
+  itself (via its model card); MTEB didn't run the model. The file metadata doesn't say which mode was used.
+- The paper's Table 1 (full training data) reports MTEB Retrieval, the same 15 BEIR tasks, as **62.16 few-shot** and
+  **61.67 zero-shot**. Our snapshot's 15-task average for bge-en-icl is exactly 62.16, so the leaderboard number is the
+  few-shot one.
+- BAAI's eval pipeline (with the per-task example pairs) is still unreleased: it's the one unchecked item in their
+  open-source plan.
+- Zero-shot (61.67), it would rank **#8** in our Oct 4 snapshot, just below inf-retriever-v1 (61.71) and above
+  Qwen3-Embedding-4B (61.58). The few-shot gain on retrieval is small (+0.5), so it's still a strong zero-shot model.
+- For our comparisons, use 61.67: our model gets no examples at eval time.
 
 **What LENS does differently:** instead of a hidden-state vector, it reads the LLM's *next-token scores over the
 vocabulary* (how strongly the text "means" each word), groups the ~32k vocabulary tokens into 8,000 clusters of
