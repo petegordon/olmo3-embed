@@ -366,6 +366,28 @@ opening of every relevant document. The corpus subfolders and `doc_index_v1.pkl`
   copy is in `data/beir_test_cache/` (gitignored).
 - On the Mac: `gh release download beir-test-cache-v1 -p beir_test_cache.zip`, then unzip into `data/beir_test_cache/`.
 
+### Laptop-only data to Drive (Oct 9, ~20 min, laptop + Mac, no units)
+For the long term, Drive (`MyDrive/olmo3-embed/data/`) should hold everything that costs time or units to make. Raw
+public downloads (`data/raw/`, ~33 GB) stay local.
+- **Inventory:** the Mac listed Drive. It had 6.7 GB in `data/`, all Colab-built: the `rescored` parquets for
+  trackb_v1, v1, v2, v2b, v3 and v3b, plus MS MARCO and two judge files. `runs/` held another 4.4 GB.
+- **Missing from Drive:** only the laptop's unreproducible LLM output and its provenance files.
+- **Release `drive-data-v1`** (27 MB zip, 85 MB unzipped, 45 files plus `MANIFEST.sha256`), at Drive-relative paths:
+  - `synth/`
+  - `variety_v2b/neg_{claude,codex}.jsonl`
+  - `trackb_v1/judge/verdicts_pilot_{claude,codex,gemini}.jsonl`
+  - the small json reports and logs from `trackb_v1/` and `variety_v1`–`v3`
+- **Placement:** the Mac unzips it into Drive. It doesn't overwrite anything, because no file in the zip already
+  exists there.
+- **Not uploaded:**
+  - `trackb_v1/decontam.parquet` (3.76 GB): it can be rebuilt, and Drive has the rescored files training reads.
+  - The variety pre-rescore parquets and the v3 pools: these are already release assets.
+  - `beir_test_cache/`: release `beir-test-cache-v1`.
+- **MS MARCO differs:** the laptop's copy is 339,934,842 bytes (Oct 4 local build), and Drive's is 340,159,918 bytes
+  (Colab-built, the one training used). Drive's copy stays as it is.
+- **Learned:** Git Bash's GNU `tar -a` silently writes a plain tar named `.zip`. Use `C:\Windows\System32\tar.exe` for
+  real zips.
+
 ---
 
 ## Recurring lessons
