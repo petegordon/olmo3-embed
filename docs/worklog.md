@@ -442,10 +442,10 @@ Run #2 on full TREC-COVID twice, rankings saved (`notebooks/phase6_treccovid_7b_
   both markers, and the driver deleted the runtime. The driver now stops instead of retrying after a cell fails
   without a dropped connection.
 
-### Phase 6 diagnostic 3: the title-only pull comes from the 7B base, not V1 (2026-10-10)
+**Phase 6 diagnostic 3: the title-only pull comes from the 7B base, not V1 (Oct 10, 09:14–10:50; petegordonusa, A100 40GB, ~9 units):**
 
-Full TREC-COVID rankings for the 1B p5-v2i and 7B run #1 (`notebooks/phase6_treccovid_rank_colab.ipynb`, petegordonusa,
-A100 40GB, 09:14–10:50, ~9 units), compared with run #2's saved rankings.
+Full TREC-COVID rankings for the 1B p5-v2i and 7B run #1 (`notebooks/phase6_treccovid_rank_colab.ipynb`),
+compared with run #2's saved rankings.
 
 | Model | Training data | nDCG@10 | judged@10 | nDCG@10, unjudged removed | top-10 with no abstract |
 |---|---|---:|---:|---:|---:|
