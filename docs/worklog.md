@@ -384,6 +384,28 @@ were re-checked against the new index (`doc_near` + `doc_contain` over TREC-COVI
 - **Learned:** re-check *all* training sources whenever the decontamination rules get stronger. A rule that is new
   for one source is new for the others too.
 
+**Phase 6 step 2: p6-bio proxy gate (Oct 9, 21:38 – Oct 10, 00:13; petegordonusa, A100 40GB, ~13.9 units):**
+p5-v2i's exact recipe plus the PubMedQA slice (`notebooks/phase6_bio_proxy_colab.ipynb`), against p5-v2i scored on the
+same full-size tasks.
+
+| Task (full size unless Nano) | p5-v2i (1B) | p6-bio (1B + PubMedQA) | Δ | 7B run #2 |
+|---|---:|---:|---:|---:|
+| TREC-COVID (50 queries) | 79.80 | 80.56 | +0.76 | **65.90** |
+| NFCorpus | 36.39 | 36.58 | +0.19 | 39.66 |
+| SciFact | 75.22 | 75.89 | +0.67 | 79.55 |
+| heldout-4 | 37.92 | 38.10 | +0.18 | 42.13 |
+| Nano avg-in-8 | 70.70 | 71.36 | +0.66 | 75.67 |
+| Nano avg-13 | 63.08 | 63.54 | +0.46 | 66.08 |
+
+- **Gate: fails on its main criterion.** +0.76 on 50 queries isn't a measurable TREC-COVID gain. SciFact and NFCorpus
+  didn't drop, and in-domain is within ±1. Per the agreed rule, PubMedQA isn't the fix: it's harmless and slightly
+  positive everywhere, but too small to carry a 7B run on its own.
+- **The real finding is the baseline:** the 1B p5-v2i scores **79.8 on TREC-COVID, 14 points above the 7B run #2
+  (65.9)**, while the 7B leads almost everywhere else. So TREC-COVID was never a biomedical-domain gap. Something
+  specific to run #2 depresses it. Prime suspect: V1, which run #2 trained on and p5-v2i didn't, and whose negatives
+  include ~4,700 CORD-19 titles (found by the index-v2 cleanup), teaching the model to push TREC-COVID documents
+  away. Diagnostic running: B3 (Track B only) vs p5-v1 (Track B + V1) on full TREC-COVID.
+
 **Learned:** headless Colab works end to end and needs no tab, but each runtime still costs one human consent click
 for Drive. The HF storage plan (`docs/colab-hf-storage-plan.md`) would remove that: an HF token goes up like the GitHub
 token, with no consent.
