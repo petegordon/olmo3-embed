@@ -249,10 +249,16 @@ query, the way you'd give an LLM examples in a prompt. It's trained with these e
   **61.67 zero-shot**. Our snapshot's 15-task average for bge-en-icl is exactly 62.16, so the leaderboard number is the
   few-shot one.
 - BAAI's eval pipeline (with the per-task example pairs) is still unreleased: it's the one unchecked item in their
-  open-source plan.
+  open-source plan. The *mechanism* is public (FlagEmbedding's `FlagICLModel` takes example pairs), but the exact pairs
+  and prompt format BAAI used for each BEIR task are not. Anyone else gets zero-shot, or their own examples and a
+  slightly different score. "Open data and code" on the leaderboard means *training*, not evaluation.
 - Zero-shot (61.67), it would rank **#8** in our Oct 4 snapshot, just below inf-retriever-v1 (61.71) and above
   Qwen3-Embedding-4B (61.58). The few-shot gain on retrieval is small (+0.5), so it's still a strong zero-shot model.
 - For our comparisons, use 61.67: our model gets no examples at eval time.
+- **For our rank, nothing changes.** The leaderboard is a table of BEIR-15 averages sorted high to low (mostly
+  self-reported). Swapping 62.16 for 61.67 moves bge-en-icl from #5 to #8 and lifts LENS-d8000 and inf-retriever-v1
+  one place each; everyone at #9 and below keeps their place. Our run #2 estimate (~55) sits in the mid-30s of 139
+  either way. It only lowers the bar for "matching bge-en-icl" by half a point: ~6.7 points above us, not ~7.2.
 
 **What LENS does differently:** instead of a hidden-state vector, it reads the LLM's *next-token scores over the
 vocabulary* (how strongly the text "means" each word), groups the ~32k vocabulary tokens into 8,000 clusters of
