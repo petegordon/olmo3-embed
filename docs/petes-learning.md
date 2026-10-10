@@ -10,6 +10,7 @@ tied back to this project. Newest entry at the bottom.
 2. [Dense vs MoE, and causal vs bidirectional attention](#2-dense-vs-moe-and-causal-vs-bidirectional-attention-2026-10-10) (Oct 10)
 3. [Is building an embedding model "post-training"?](#3-is-building-an-embedding-model-post-training-2026-10-10) (Oct 10)
 4. [What would the weakly supervised stage take?](#4-what-would-the-weakly-supervised-stage-take-2026-10-10) (Oct 10)
+5. [bge-en-icl and LENS: the open recipes closest to ours](#5-bge-en-icl-and-lens-the-open-recipes-closest-to-ours-2026-10-10) (Oct 10)
 
 ---
 
@@ -214,4 +215,39 @@ the top.
    fine-tune on top.
 2. Compare against plain B3 on the held-out tasks (the same gate as earlier phases).
 3. Only if it wins clearly, try ~1M pairs on the 7B.
+
+---
+
+## 5. bge-en-icl and LENS: the open recipes closest to ours (2026-10-10)
+
+**Question:** bge-en-icl (#5 on the HF BEIR board) says its training data and code are open; LENS-d8000 (#6) says its
+data is open. What do they tell us?
+
+| | bge-en-icl (BAAI) | LENS-d8000 (Lei et al., ACL 2025) | Us (7B run #2) |
+|---|---|---|---|
+| BEIR-15 | 62.16 | 61.86 | ~55 (estimate, rank ~33) |
+| Base model | Mistral-7B (dense decoder) | Mistral-7B (dense decoder) | OLMo-3-7B (dense decoder) |
+| Attention / pooling | causal, EOS last token | bidirectional, max-pool over vocabulary logits | causal, EOS last token |
+| Output | one dense vector | 8,000-dim "lexicon" vector | one dense vector |
+| Training | one supervised contrastive stage (InfoNCE, hard negatives) | same, on bge-en-icl's public data | one supervised contrastive stage |
+| Weak 150M-pair stage | no | no | no |
+| Data | `cfli/bge-full-data` (public, no license declared) | bge-en-icl's public data | Track B (partly from the same bge data) + variety |
+| Code | open (FlagEmbedding) | open (github.com/Yibin-Lei/LENS) | ours |
+
+**The lesson:** two of the top six reached ~62 from a 7B LLM **without** a Qwen-style weak stage, with one supervised
+contrastive stage on public data. That's our recipe's shape. The ~7-point gap is in the details (data mix and size,
+hard-negative quality, task instructions, few-shot examples), not a missing stage.
+
+**What "ICL" means:** in-context learning. bge-en-icl can take a few example query–document pairs in front of the
+query, the way you'd give an LLM examples in a prompt. It's trained with these examples so it learns to use them. Check
+whether a leaderboard score was run with or without them.
+
+**What LENS does differently:** instead of a hidden-state vector, it reads the LLM's *next-token scores over the
+vocabulary* (how strongly the text "means" each word), groups the ~32k vocabulary tokens into 8,000 clusters of
+similar words, and keeps the max per cluster. Each dimension roughly stands for a group of words. It sits between dense
+retrieval and sparse word matching (entry 2).
+
+**The experiment this suggests:** train OLMo-3-7B with bge-en-icl's open code and public data, recipe unchanged. That
+compares OLMo to Mistral under identical training, and shows how much of our gap is recipe vs base model. Caveats: the
+bge data declares no license, contains BEIR train splits (Track B only), and needs our decontamination pass.
 
