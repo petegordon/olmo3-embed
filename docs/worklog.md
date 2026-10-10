@@ -323,6 +323,35 @@ Quora, TREC-COVID, CQADupstack), ranked against the 139 15-task models in `docs/
 - **Biggest gaps:** TREC-COVID (−14 vs LLM2Vec, −25 vs Qwen3-4B) and, by projection, Touche and ClimateFEVER.
   In-domain (NQ, HotpotQA, FEVER) projects at or above Qwen3-4B.
 
+**Phase 6 data: PubMedQA biomedical slice, built and decontaminated on the Mac (Oct 9, 20:56–21:30):**
+- **Source:** `qiaojin/PubMedQA` `pqa_artificial` (MIT), 30,000 rows sampled (seed 0) of 211,269, one per PubMed id:
+  research question (generated from the title) → full abstract (context paragraphs + conclusion, median 1,633 chars).
+  `build_variety.py --sources pubmedqa`.
+- **Zero-shot protocol for TREC-COVID** (Pete, 2026-10-09): no TREC-COVID queries or qrels, and no document overlap
+  with its 171,332 CORD-19 docs (nor NFCorpus / SciFact, which are PubMed too).
+- **Test cache:** the Mac had no `data/raw/beir_test/` and only 22 GB free disk. The laptop's 39 per-task JSONs
+  (queries + relevant-doc openings, 47.9 MB) came over as release `beir-test-cache-v1`, all repo/revision pairs equal
+  to the current mteb tasks. With them the index build only downloads the 8 small full corpora + CQADupStack.
+
+| Step | Result |
+|---|---|
+| Query decontam (`decontam.py`, 72,055 test queries, 39 tasks) | 0 / 30,000 dropped |
+| Doc index rebuild (`doc_decontam.py --build`, 1,853,796 full-corpus docs, 139,199 test positives) | ~3.5 min, 3 GB RAM |
+| Old rules (exact, prefix, near-dup of first 300 chars) | 5 dropped: 2 TREC-COVID prefix, 3 NanoNFCorpus positives |
+| **New `doc_contain` rule** (≥5% of word 8-grams in a TREC-COVID / NFCorpus / SciFact corpus) | **186 more dropped**: 159 TREC-COVID, 15 NFCorpus, 12 SciFact |
+| **Kept** | **29,809** |
+
+- **The old rules missed ~140 near-verbatim copies of test documents** (≥50% of 8-grams; 118 CORD-19). CORD-19
+  stores "title + section label + abstract" and PubMedQA the bare abstract: the same text, offset, so exact/prefix
+  matching and the first-300-char MinHash both fail. Found by an independent 8-gram containment check run because 2
+  hits looked low for 299 coronavirus-related rows.
+- **Threshold:** overlap is bimodal (139 rows ≥50%, 1 at 20–50%, 46 at 5–20%, 1,408 at 2–5%). 5–20% looked like
+  related papers sharing sentences, dropped anyway under zero tolerance; below 5% is shared boilerplate.
+- **Verified:** after the rule, the independent check finds 0 rows at ≥5% overlap with any of the three corpora.
+- **Learned:** document decontamination needs a containment check against the whole test corpus, not just a prefix
+  or near-duplicate match, whenever the source and the test corpus format the same text differently. `doc_contain`
+  is now permanent in `doc_decontam.py` (index v2), so every future source gets it.
+
 **Learned:** headless Colab works end to end and needs no tab, but each runtime still costs one human consent click
 for Drive. The HF storage plan (`docs/colab-hf-storage-plan.md`) would remove that: an HF token goes up like the GitHub
 token, with no consent.

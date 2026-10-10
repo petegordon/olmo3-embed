@@ -11,6 +11,13 @@ entities, scientific abstracts) also put test-corpus *documents* at risk, so pas
                            Jaccard >= 0.8) a test-qrel POSITIVE document of any of the 39 test sets. This also covers
                            the Wikipedia-based tasks (ClimateFEVER, DBPedia, FEVER, HotpotQA, NQ), whose corpora are too
                            large to index whole and are shared with standard training data anyway.
+  doc_near                 passage near-duplicates (same MinHash rule) ANY document of the biomedical full corpora:
+                           TREC-COVID (CORD-19, 171k), NFCorpus, SciFact. Catches the same abstract with different
+                           formatting or a truncated/extended version (Phase 6: PubMed sources vs CORD-19).
+  doc_contain              >= CONTAIN (5%) of the passage's word 8-grams occur anywhere in a NEAR_FULL corpus. Needed
+                           because CORD-19 stores "title + section label + abstract" while PubMed sources carry the bare
+                           abstract: the same text, offset, so neither exact/prefix nor first-300-char MinHash matches.
+                           Phase 6 (PubMedQA, 30k): the old rules caught 5 rows, this rule 186 more (139 at >=50%).
 
     python -m olmo3_embed.data.doc_decontam --build                      # once: index -> $OLMO3_RAW/beir_test/
     python -m olmo3_embed.data.doc_decontam --check data.parquet --columns positives negatives [--out kept.parquet]
@@ -26,18 +33,28 @@ import json
 import os
 import pickle
 
+import numpy as np
+
 from datasketch import MinHash, MinHashLSH
 from huggingface_hub import HfApi
 
-from olmo3_embed.data.decontam import CACHE, h, iter_records, load_test, norm, shingles, test_tasks
+from olmo3_embed.data.decontam import CACHE, h, iter_records, load_test, norm, rid, shingles, test_tasks
 
 FULL_CORPUS = {"Touche2020", "ArguAna", "SCIDOCS", "NFCorpus", "SciFact", "FiQA2018", "TRECCOVID", "QuoraRetrieval"}
+NEAR_FULL = {"TRECCOVID", "NFCorpus", "SciFact"}  # every corpus doc gets the near-duplicate check, not just positives
 PREFIX, NEAR_CHARS, NUM_PERM, JACCARD = 200, 300, 128, 0.8
-INDEX = os.path.join(CACHE, "doc_index_v1.pkl")
+CONTAIN_N, CONTAIN = 8, 0.05
+INDEX = os.path.join(CACHE, "doc_index_v2.pkl")  # v2: + doc_near over NEAR_FULL corpora
 
 
 def h64(s: str) -> int:
     return int.from_bytes(hashlib.sha1(s.encode()).digest()[:8], "big")
+
+
+def grams8(n: str) -> np.ndarray:
+    """64-bit hashes of the word CONTAIN_N-grams of normalized text n."""
+    w = n.split()
+    return np.array([h64(" ".join(w[i : i + CONTAIN_N])) for i in range(len(w) - CONTAIN_N + 1)], dtype=np.uint64)
 
 
 def mh(sh: set[str]) -> MinHash:
@@ -53,6 +70,19 @@ class DocIndex:
         self.pos: dict[str, tuple[str, str]] = {}  # decontam.h(full positive text) -> (task, docid)
         self.pos_sh: dict[str, set[str]] = {}
         self.lsh = MinHashLSH(threshold=JACCARD, num_perm=NUM_PERM)
+        self.grams: dict[str, np.ndarray] = {}  # NEAR_FULL task -> sorted unique 8-gram hashes of its whole corpus
+
+    def contain(self, n: str):
+        g = grams8(n)
+        if not len(g):
+            return None
+        for task, s in getattr(self, "grams", {}).items():
+            i = np.searchsorted(s, g)
+            i[i == len(s)] = 0
+            frac = float((s[i] == g).mean())
+            if frac >= CONTAIN:
+                return ("doc_contain", task, f"{frac:.2f}")
+        return None
 
     def add_full(self, task: str, text: str):
         n = norm(text)
@@ -61,6 +91,14 @@ class DocIndex:
         self.full.setdefault(h64(n), task)
         if len(n) > PREFIX:
             self.prefix.setdefault(h64(n[:PREFIX]), task)
+
+    def add_near(self, task: str, docid: str, text: str):
+        """Near-duplicate entry for a full-corpus document (NEAR_FULL tasks); keyed 'task\tdoc:<id>'."""
+        sh = shingles(norm(text)[:NEAR_CHARS])
+        key = f"{task}\tdoc:{docid}"
+        if sh and key not in self.pos_sh:
+            self.pos_sh[key] = sh
+            self.lsh.insert(key, mh(sh))
 
     def add_positive(self, task: str, docid: str, text: str, full_hash: str | None = None):
         """text may be a prefix (decontam.py caches the first 300 chars); full_hash = decontam.h(full text)."""
@@ -92,8 +130,9 @@ class DocIndex:
             for key in self.lsh.query(mh(sh)):
                 t = self.pos_sh[key]
                 if len(sh & t) / len(sh | t) >= JACCARD:
-                    return ("pos_near",) + tuple(key.split("\t"))
-        return None
+                    task, ref = key.split("\t")
+                    return ("doc_near", task, ref[4:]) if ref.startswith("doc:") else ("pos_near", task, ref)
+        return self.contain(n)
 
 
 def corpus_records(task):
@@ -110,9 +149,20 @@ def build() -> DocIndex:
         name = task.metadata.name
         full = name in FULL_CORPUS or (name.startswith("CQADupstack") and not name.startswith("Nano"))
         if full:
+            gs = []
             for r in corpus_records(task):
-                idx.add_full(name, f"{r.get('title') or ''} {r.get('text') or ''}")
+                text = f"{r.get('title') or ''} {r.get('text') or ''}"
+                if name in NEAR_FULL:
+                    gs.append(grams8(norm(text)))
+                idx.add_full(name, text)
                 counts[f"full:{name}"] += 1
+                if name in NEAR_FULL:
+                    idx.add_near(name, rid(r), text)
+                    for part in (r.get("title") or "", r.get("text") or ""):  # abstract alone, without its title
+                        if part and len(norm(part)) > 50:
+                            idx.add_full(name, part)
+            if gs:
+                idx.grams[name] = np.unique(np.concatenate(gs))
         c = load_test(task, docs=True)  # cached by decontam.py --docs
         for k, (docid, text300) in (c["pos_docs"] or {}).items():
             idx.add_positive(name, docid, text300, full_hash=k)

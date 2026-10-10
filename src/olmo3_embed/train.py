@@ -190,6 +190,7 @@ EXTRA_INSTRUCTIONS = {
     "SynthCounterArgument": "Given an argument, retrieve the speech that rebuts it",
     "SynthEntitySearch": "Given a keyword search, retrieve the description of the entity it refers to",
     "SynthClimateClaim": "Given a claim about the climate or environment, retrieve passages that support or refute it",
+    "PubMedQA": "Given a biomedical research question, retrieve the abstract of the study that answers it",
 }
 _INSTR: dict[str, str] = dict(EXTRA_INSTRUCTIONS)
 

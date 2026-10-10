@@ -1,6 +1,7 @@
 """Task-variety V1: public non-BEIR pairs (docs/task-variety-plan.md, sources A; vetted 2026-10-07).
 
     python -m olmo3_embed.data.build_variety [--per-site 1000] [--s2orc 60000] [--out data/variety_v1]
+    python -m olmo3_embed.data.build_variety --sources pubmedqa --pubmedqa 30000 --out data/variety_bio
 
   StackExchange  flax-sentence-embeddings/stackexchange_title_body_jsonl (CC BY-SA 4.0): question title -> title+body.
                  Every site EXCEPT the 12 CQADupStack test forums and money (FiQA-2018's source: decontam found 44
@@ -8,6 +9,10 @@
   S2ORCCitation  sentence-transformers/s2orc title-citation-pair (ODC-By 1.0): paper title -> title it cites.
                  Pairs where either title is a SCIDOCS corpus title are dropped (SCIDOCS is built from the same S2
                  graph); --s2orc rows sampled from the stream.
+  PubMedQA       qiaojin/PubMedQA pqa_artificial (MIT; Phase 6, biomedical gap / TREC-COVID shape): research question
+                 (generated from the paper's title) -> that paper's PubMed abstract (context paragraphs + conclusion).
+                 One row per PubMed id, --pubmedqa rows sampled. Zero-shot protocol: no TREC-COVID queries, qrels or
+                 CORD-19 documents; doc_decontam.py drops any abstract matching TREC-COVID/NFCorpus/SciFact corpus docs.
 
 Output <out>/ingested.parquet in Track B's schema (qid, task, source, query, positives, negatives=[]). Then, as for
 Track B: decontam.py --docs (queries), doc_decontam.py --check (passages), rescore.py (negatives mined within each
@@ -110,15 +115,49 @@ def ingest_s2orc(n: int, seed: int, stats: dict) -> list[dict]:
     return rows
 
 
+def ingest_pubmedqa(n: int, seed: int, stats: dict) -> list[dict]:
+    ds = load_dataset("qiaojin/PubMedQA", "pqa_artificial", split="train")
+    stats["pubmedqa"]["source_rows"] = len(ds)
+    rows, seen = [], set()
+    for i in random.Random(seed).sample(range(len(ds)), len(ds)):
+        r = ds[i]
+        q = (r.get("question") or "").strip()
+        ctx = r.get("context") or {}
+        parts = [c.strip() for c in (ctx.get("contexts") or []) if c and c.strip()]
+        if (r.get("long_answer") or "").strip():
+            parts.append(r["long_answer"].strip())  # full abstract: CORD-19 / NFCorpus / SciFact docs are full abstracts
+        doc = " ".join(parts)
+        pid = str(r.get("pubid"))
+        if not q or len(doc) < 200 or pid in seen:
+            stats["pubmedqa"]["skipped_empty_or_dup"] += 1
+            continue
+        seen.add(pid)
+        rows.append({"qid": f"PubMedQA:{pid}", "task": "PubMedQA", "source": "qiaojin/PubMedQA/pqa_artificial",
+                     "query": q, "positives": [doc], "negatives": []})
+        if len(rows) >= n:
+            break
+    stats["pubmedqa"]["rows"] = len(rows)
+    return rows
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--per-site", type=int, default=1000)
     ap.add_argument("--s2orc", type=int, default=60_000)
+    ap.add_argument("--pubmedqa", type=int, default=30_000)
+    ap.add_argument("--sources", default="stackexchange,s2orc", help="comma list of stackexchange, s2orc, pubmedqa")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", default="data/variety_v1")
     args = ap.parse_args()
     stats = collections.defaultdict(collections.Counter)
-    rows = ingest_stackexchange(args.per_site, args.seed, stats) + ingest_s2orc(args.s2orc, args.seed, stats)
+    src = {x.strip() for x in args.sources.split(",")}
+    rows = []
+    if "stackexchange" in src:
+        rows += ingest_stackexchange(args.per_site, args.seed, stats)
+    if "s2orc" in src:
+        rows += ingest_s2orc(args.s2orc, args.seed, stats)
+    if "pubmedqa" in src:
+        rows += ingest_pubmedqa(args.pubmedqa, args.seed, stats)
     os.makedirs(args.out, exist_ok=True)
     df = pd.DataFrame(rows)
     df.to_parquet(f"{args.out}/ingested.parquet", index=False, row_group_size=20_000)
