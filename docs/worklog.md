@@ -405,6 +405,13 @@ same full-size tasks.
   specific to run #2 depresses it. Prime suspect: V1, which run #2 trained on and p5-v2i didn't, and whose negatives
   include ~4,700 CORD-19 titles (found by the index-v2 cleanup), teaching the model to push TREC-COVID documents
   away. Diagnostic running: B3 (Track B only) vs p5-v1 (Track B + V1) on full TREC-COVID.
+- **Diagnostic (Oct 10, 04:21–04:57, petegordonusa, ~3 units): V1 is not the cause.** Full TREC-COVID: B3 (Track B)
+  72.80, p5-v1 (Track B + V1) 74.02, p5-v2i (Track B + V2, instructions) 79.80, p6-bio 80.56, 7B run #2 65.90. V1's
+  CORD-19 negatives didn't depress TREC-COVID at 1B (+1.2). Instructions + V2 lift the 1B by ~7. The 7B, on the same
+  kinds of data with instructions, is 14 below the 1B: the cause is specific to the 7B. Next suspects: the 7B's
+  handling of the unseen TREC-COVID instruction, and TREC-COVID's shallow judgments (a model that retrieves different,
+  unjudged CORD-19 papers is scored as wrong). `eval.py` now has `--run-instructions on|off`, `--name-suffix` and
+  `--predictions` (saved rankings, for a judged@10 check).
 
 **Learned:** headless Colab works end to end and needs no tab, but each runtime still costs one human consent click
 for Drive. The HF storage plan (`docs/colab-hf-storage-plan.md`) would remove that: an HF token goes up like the GitHub

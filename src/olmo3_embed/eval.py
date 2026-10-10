@@ -45,6 +45,10 @@ def main():
                     help="use our OlmoEmbedder (model.py) instead of mteb's registered loader")
     ap.add_argument("--no-instructions", action="store_true", help="OlmoEmbedder: no query instructions")
     ap.add_argument("--load-in-4bit", action="store_true", help="OlmoEmbedder: bitsandbytes nf4 (local 7B smoke tests)")
+    ap.add_argument("--run-instructions", choices=["on", "off"],
+                    help="--run: override the run's own instruction setting (diagnostics); results get a name suffix")
+    ap.add_argument("--name-suffix", help="--run: results folder olmo3-embed__<run_name><suffix> (keeps variants apart)")
+    ap.add_argument("--predictions", help="save per-query rankings here (mteb prediction_folder), e.g. for judged@10")
     args = ap.parse_args()
 
     if args.tasks:
@@ -56,8 +60,17 @@ def main():
     if args.run:
         from olmo3_embed.model import OlmoEmbedder
 
+        import json as _json
+        import os as _os
+
+        instr = None if args.run_instructions is None else args.run_instructions == "on"
+        suffix = args.name_suffix or (f"-instr{args.run_instructions}" if args.run_instructions else "")
+        run_name = None
+        if suffix:
+            run_name = _json.load(open(_os.path.join(args.run, "embed_config.json")))["run_name"] + suffix
         model = OlmoEmbedder.from_run(
             args.run, max_length=args.max_seq_length or 512, batch_size=args.batch_size, dtype=args.dtype,
+            instructions=instr, run_name=run_name,
         )
     elif args.olmo_pooling:
         from olmo3_embed.model import OlmoEmbedder
@@ -78,6 +91,7 @@ def main():
         cache=mteb.ResultCache(args.out),
         encode_kwargs={"batch_size": args.batch_size},
         overwrite_strategy="only-missing",
+        **({"prediction_folder": args.predictions} if args.predictions else {}),
     )
 
 
