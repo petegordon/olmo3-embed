@@ -327,6 +327,16 @@ Quora, TREC-COVID, CQADupstack), ranked against the 139 15-task models in `docs/
 for Drive. The HF storage plan (`docs/colab-hf-storage-plan.md`) would remove that: an HF token goes up like the GitHub
 token, with no consent.
 
+### BEIR test cache to the Mac (Oct 9, ~5 min, laptop, no units)
+The Mac needed the laptop's per-task BEIR test JSONs to rebuild the doc-decontam index for the new near-duplicate
+check. That's the 39 top-level `data/raw/beir_test/*.json` files, 47.9 MB, which hold each test set's queries plus the
+opening of every relevant document. The corpus subfolders and `doc_index_v1.pkl` were skipped.
+- Neither planned route was usable. Drive for desktop isn't installed on the laptop. The USB drive Pete attached is a
+  Seagate Backup Plus formatted HFS+ (MBR type `0xAF`), which Windows can't mount.
+- So the files went as a private release asset instead: `beir-test-cache-v1` / `beir_test_cache.zip` (19.6 MB). A local
+  copy is in `data/beir_test_cache/` (gitignored).
+- On the Mac: `gh release download beir-test-cache-v1 -p beir_test_cache.zip`, then unzip into `data/beir_test_cache/`.
+
 ---
 
 ## Recurring lessons
