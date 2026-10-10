@@ -124,11 +124,13 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", default="data/trackb_v1")
     ap.add_argument("--docs", action="store_true", help="also stream test corpora: Quora doc rule + positive-doc report")
-    ap.add_argument("--manifest", default="manifests/trackb_v1_dropped_qids.txt",
+    ap.add_argument("--manifest", default=None,  # default: manifests/<data folder name>_dropped_qids.txt
                     help="committed list of dropped qids (written by a full run, read by --apply)")
     ap.add_argument("--apply", action="store_true",
                     help="skip the checks: drop the manifest's qids from ingested.parquet (Colab: no test corpora needed)")
     args = ap.parse_args()
+    # Per-dataset default, so checking another source never overwrites Track B's committed manifest (it did once).
+    args.manifest = args.manifest or f"manifests/{os.path.basename(os.path.normpath(args.data))}_dropped_qids.txt"
 
     df = pd.read_parquet(f"{args.data}/ingested.parquet")
     print(f"train rows: {len(df)}", flush=True)
