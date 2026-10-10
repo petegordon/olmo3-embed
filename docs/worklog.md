@@ -416,6 +416,32 @@ same full-size tasks.
   unjudged CORD-19 papers is scored as wrong). `eval.py` now has `--run-instructions on|off`, `--name-suffix` and
   `--predictions` (saved rankings, for a judged@10 check).
 
+**Phase 6 diagnostic 2: what holds the 7B down on TREC-COVID (Oct 10, 06:05–08:47; petegordonusa, A100 40GB, ~14.2 units):**
+Run #2 on full TREC-COVID twice, rankings saved (`notebooks/phase6_treccovid_7b_colab.ipynb`, `eval.py
+--run-instructions/--name-suffix/--predictions`), then `scripts/judged_at_k.py` on the Mac.
+
+| 7B run #2 | MTEB nDCG@10 | judged@10 | nDCG@10, unjudged removed |
+|---|---:|---:|---:|
+| as trained (instructions on) | 65.90 (reproduced exactly) | 0.742 | 83.9 |
+| instructions off | 56.99 | 0.666 | 78.5 |
+
+- **Instructions help (+8.9); they aren't the cause.**
+- **The cause: a strong pull toward title-only CORD-19 entries.** 98% of the 129 unjudged top-10 documents have no
+  abstract, against 24.6% of the corpus and 15.6% of all judged documents. TREC-COVID's 2020 pools rarely judged
+  those entries, so they count as misses even when they look relevant ("Is reinfection possible after recovery from
+  COVID-19?" for the post-recovery immunity query). On judged documents only, run #2 scores 83.9.
+- **No embedding collapse:** 485 distinct documents fill the 500 top-10 slots, and no document recurs in more than 3
+  queries' top 10.
+- **Suspect:** V1's S2ORC pairs are bare title → bare title (~60k rows), which reward matching a query to a short
+  title. At 1B, V1 didn't hurt TREC-COVID (+1.2), but the 7B may learn the shortcut harder. Possible run #3 fix: use
+  `sentence-transformers/s2orc` title → abstract pairs instead.
+- **Next checks (proposed, ~9 units):** rankings from the 1B p5-v2i (is the title-only pull 7B-specific?) and from 7B
+  run #1, which had no V1 (does V1 cause it?).
+- **Also learned:** an argparse value starting with `-` must be passed as `--opt=value`. A notebook's "done" marker
+  must check the work's own output, not the push's exit code: a failed eval followed by "nothing new to push" wrote
+  both markers, and the driver deleted the runtime. The driver now stops instead of retrying after a cell fails
+  without a dropped connection.
+
 **Learned:** headless Colab works end to end and needs no tab, but each runtime still costs one human consent click
 for Drive. The HF storage plan (`docs/colab-hf-storage-plan.md`) would remove that: an HF token goes up like the GitHub
 token, with no consent.
