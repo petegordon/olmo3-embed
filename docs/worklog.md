@@ -442,6 +442,30 @@ Run #2 on full TREC-COVID twice, rankings saved (`notebooks/phase6_treccovid_7b_
   both markers, and the driver deleted the runtime. The driver now stops instead of retrying after a cell fails
   without a dropped connection.
 
+### Phase 6 diagnostic 3: the title-only pull comes from the 7B base, not V1 (2026-10-10)
+
+Full TREC-COVID rankings for the 1B p5-v2i and 7B run #1 (`notebooks/phase6_treccovid_rank_colab.ipynb`, petegordonusa,
+A100 40GB, 09:14–10:50, ~9 units), compared with run #2's saved rankings.
+
+| Model | Training data | nDCG@10 | judged@10 | nDCG@10, unjudged removed | top-10 with no abstract |
+|---|---|---:|---:|---:|---:|
+| 1B p5-v2i | Track B + V2 | 79.80 | 0.900 | 83.6 | 24.0% |
+| 7B run #1 | Track B only, no instructions | 58.12 | 0.684 | 80.5 | 76.6% |
+| 7B run #2 | Track B + V1 + V2 | 65.90 | 0.742 | 83.9 | 73.4% |
+| 7B run #2, instructions off | | 56.99 | 0.666 | 78.5 | 82.6% |
+
+The corpus is 24.6% title-only, so the 1B ranks title-only entries at their base rate. Both 7Bs fill about three
+quarters of their top 10 with them.
+
+- **V1 isn't the cause.** Run #1 never saw V1 and shows the same pull (99% of its unjudged top-10 hits have no
+  abstract). Swapping S2ORC title → title for title → abstract wouldn't fix it.
+- **It follows the base model.** The two 7B runs share only the base model (OLMo-3-7B against OLMo-2-1B) and the
+  recipe settings, which the 1B shares too.
+- **On judged documents the 7B is as good as the 1B** (83.9 against 83.6). The 14-point gap on the official score
+  is almost all unjudged title-only entries counted as misses. TREC-COVID's 2020 pools rarely judged them.
+- **Implication:** recovering TREC-COVID means teaching the 7B to rank a full abstract above a bare title on the same
+  topic. That optimizes against a pool artefact more than it improves retrieval.
+
 **Learned:** headless Colab works end to end and needs no tab, but each runtime still costs one human consent click
 for Drive. The HF storage plan (`docs/colab-hf-storage-plan.md`) would remove that: an HF token goes up like the GitHub
 token, with no consent.
