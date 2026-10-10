@@ -5,7 +5,11 @@
 # GPU memory knobs (gradient_checkpointing, chunk_size) are set per runtime by the notebook's timing cell.
 run_name: p6-run3-7b
 model: allenai/Olmo-3-1025-7B
-data: data/trackb_v1/rescored.parquet,data/variety_v1/rescored.parquet,data/variety_v2/rescored.parquet,data/variety_bio/rescored.parquet
+# Cleaned copies (Phase 6 cleanup, Oct 9): rows whose positive overlaps a zero-shot test corpus dropped, overlapping
+# negatives removed (doc_decontam index v2: near-dup + 8-gram containment vs TREC-COVID/NFCorpus/SciFact/SCIDOCS).
+# trackb_v1c: only TREC-COVID, SCIDOCS, ArguAna, Touche2020, CQADupStack overlap removed (by-design overlap with BEIR
+# tasks that have a train split is kept, as in runs #1-2). variety_v2 needed no change.
+data: data/trackb_v1c/rescored.parquet,data/variety_v1c/rescored.parquet,data/variety_v2/rescored.parquet,data/variety_bioc/rescored.parquet
 n_examples: 115000
 pooling: last
 bidirectional: false

@@ -182,12 +182,17 @@ within each task's own pool. Plan and results: `docs/task-variety-plan.md`.
 - **Why `doc_contain` exists:** CORD-19 stores "title + section label + abstract" while PubMed sources carry the bare
   abstract. The text is the same but offset, so exact, prefix and first-300-character MinHash matching all miss it.
   On PubMedQA, the first three rules caught 5 rows. `doc_contain` caught 186 more, 139 of them with ≥50% overlap.
-- **Not yet applied retroactively:** V1 and V2 were checked with the first two rules only (index v1). See "Still to add".
+- **Applied retroactively (2026-10-09):** V1, V2 and Track B were re-checked with index v2. V1 had 520 rows whose
+  positive is a test document (mostly S2ORC cited titles that are CORD-19 titles) and ~6,800 such negatives. Track B
+  had 528 rows overlapping test sets with no BEIR train split (TREC-COVID 494, SCIDOCS 107, plus a few ArguAna, Touche
+  and CQADupStack) and ~4,460 such negatives. V2 was clean.
+- **Cleaned training copies** (Drive): `trackb_v1c` (373,234 rows; only zero-shot test-set overlap removed),
+  `variety_v1c` (138,442), `variety_bioc` (29,807). Runs #1 and #2 trained on the uncleaned versions, so their
+  TREC-COVID, SCIDOCS, SciFact and NFCorpus scores are not strictly zero-overlap. Run #3 uses the cleaned copies.
 
 ## Still to add
 - LLM judge pass on Quora, SciFact and NFCorpus: OLMo-3.1-32B-Instruct for the bulk, Claude to verify, Codex and Gemini
   to break ties. Per-judge agreement goes here.
 - Final per-task row counts and the sampling temperature used in training.
 - A Dolma 3 contamination check (Phase 6).
-- Re-check V1 and V2 with index v2 (`doc_near`, `doc_contain`) before 7B run #3, which trains on them.
 - PubMedQA rescoring stats (negatives per row, guard rate) once `p6-bio` has mined them.

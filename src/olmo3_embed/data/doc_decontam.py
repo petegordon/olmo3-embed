@@ -201,12 +201,18 @@ def main():
     ap.add_argument("--check")
     ap.add_argument("--columns", nargs="+", default=["positives", "negatives"])
     ap.add_argument("--out")
+    ap.add_argument("--only-tasks", nargs="+",
+                    help="act only on hits against these test sets (and their Nano versions); others are ignored. "
+                         "Track B keeps by-design overlap with BEIR tasks that HAVE a train split; zero-shot sets don't")
     args = ap.parse_args()
     idx = build() if args.build else None
     if not args.check:
         return
     idx = idx or load()
     df = pd.read_parquet(args.check)
+    only = set(args.only_tasks or []) | {f"Nano{t}Retrieval" for t in args.only_tasks or []}
+    if args.only_tasks and "CQADupstack" in args.only_tasks:
+        only |= {n for n in [t.metadata.name for t in test_tasks()] if n.startswith("CQADupstack")}
     hits, keep, cleaned_negs, cleaned_scores = collections.Counter(), [], [], []
     has_scores = "neg_scores" in df.columns  # rescored files: per-negative scores, kept aligned with negatives
     for i, r in enumerate(df.itertuples(index=False)):
@@ -217,6 +223,8 @@ def main():
             ok, mask = [], []
             for v in vals:
                 hit = idx.check(v)
+                if hit and only and hit[1] not in only:
+                    hit = None
                 if hit:
                     hits[(col, hit[0], hit[1])] += 1
                     bad_pos |= col.startswith("pos")
@@ -234,6 +242,9 @@ def main():
     for (col, rule, task), n in sorted(hits.items()):
         print(f"  {col:<10} {rule:<11} {task:<32} {n}")
     print(f"rows {len(df)}; rows with a flagged positive {keep.count(False)}")
+    if "task" in df.columns and keep.count(False):
+        dropped = collections.Counter(t for t, k in zip(df["task"], keep) if not k)
+        print("  dropped rows by train task: " + ", ".join(f"{t} {n}" for t, n in dropped.most_common()))
     if args.out:
         if "negatives" in args.columns:
             df = df.assign(negatives=cleaned_negs)

@@ -352,6 +352,38 @@ Quora, TREC-COVID, CQADupstack), ranked against the 139 15-task models in `docs/
   or near-duplicate match, whenever the source and the test corpus format the same text differently. `doc_contain`
   is now permanent in `doc_decontam.py` (index v2), so every future source gets it.
 
+**Phase 6 cleanup: the training data re-checked against index v2 (Oct 9, 21:50–23:45, Mac CPU, no units):**
+Pete's zero-contamination commitment covers every source run #3 trains on, not just PubMedQA. So V1, V2 and Track B
+were re-checked against the new index (`doc_near` + `doc_contain` over TREC-COVID, NFCorpus, SciFact and now SCIDOCS).
+
+| Data | Rows with a flagged positive | Flagged negatives | Mostly |
+|---|---:|---:|---|
+| V1 (StackExchange + S2ORC), **used in run #2** | 520 / 138,962 | ~6,800 | S2ORC cited titles that are CORD-19 / SciFact / NFCorpus / SCIDOCS paper titles |
+| V2 (synthetic debate) | 0 / 7,989 | 0 | |
+| PubMedQA (+ SCIDOCS checks) | 2 / 29,809 | 24 | SCIDOCS |
+| SciRepEval search (new fallback source) | 988 / 29,997 | n/a | TREC-COVID, SCIDOCS |
+| Track B, zero-shot test sets only | 528 / 373,762 | ~4,460 | TREC-COVID (494 positives), SCIDOCS (107) |
+
+- **Why V1 leaked:** index v1 matched whole documents only. Index v2 also indexes each TREC-COVID / NFCorpus /
+  SciFact / SCIDOCS document's title alone, and S2ORC's positives are bare cited titles: 157 equal a CORD-19 title.
+- **Track B policy:** only overlap with the test sets that have **no** BEIR train split was removed (TREC-COVID,
+  SCIDOCS, ArguAna, Touche2020, CQADupStack; `doc_decontam --only-tasks`). Overlap with the tasks Track B trains on
+  (Quora, NFCorpus, FiQA, HotpotQA, ...) is by design and documented in the data card. Dropped rows: MS MARCO 443,
+  HotpotQA 68, NQ 17. Short passages need only ~3 shared 8-grams to reach 5%, so some of these are likely common
+  phrasing; dropping them (0.14%) is the conservative side.
+- **Cleaned copies on Drive** (new folders; the originals stay for provenance): `trackb_v1c` (373,234 rows),
+  `variety_v1c` (138,442), `variety_bioc` (29,807). Negatives keep their `neg_scores` aligned. Release
+  `data-variety-bio-v2` supersedes `-v1`. `configs/7b-run3.yaml` and its notebook now read the cleaned copies.
+- **Caveat on run #2 (and run #1 for Track B):** their training data contained TREC-COVID / SCIDOCS documents, mostly
+  as *negatives* (pushed away from queries) and as titles. That more likely hurt than helped those tasks, but run #2's
+  TREC-COVID (65.9), SCIDOCS (23.8), SciFact and NFCorpus scores are not strictly zero-overlap. Run #3 is the first
+  run trained without it.
+- **Also found:** `decontam.py` wrote its manifest to Track B's committed path whatever `--data` was. A PubMedQA run
+  emptied it. Restored before any commit, and the default now follows `--data`.
+- **p6-bio** (the proxy) trains on PubMedQA v1, so it includes the 2 SCIDOCS rows: negligible for the gate.
+- **Learned:** re-check *all* training sources whenever the decontamination rules get stronger. A rule that is new
+  for one source is new for the others too.
+
 **Learned:** headless Colab works end to end and needs no tab, but each runtime still costs one human consent click
 for Drive. The HF storage plan (`docs/colab-hf-storage-plan.md`) would remove that: an HF token goes up like the GitHub
 token, with no consent.
