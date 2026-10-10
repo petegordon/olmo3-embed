@@ -385,6 +385,9 @@ public downloads (`data/raw/`, ~33 GB) stay local.
   - `beir_test_cache/`: release `beir-test-cache-v1`.
 - **MS MARCO differs:** the laptop's copy is 339,934,842 bytes (Oct 4 local build), and Drive's is 340,159,918 bytes
   (Colab-built, the one training used). Drive's copy stays as it is.
+- **On Drive (Mac, Oct 9 21:40):** all 45 files passed `shasum -c` after download, were copied with `rsync -a
+  --ignore-existing` (none already existed, so nothing was skipped), and passed `shasum -c` again on Drive. The
+  manifest sits at `data/MANIFEST_drive-data-v1.sha256`. 84.4 MB in total, including 82 MB of `synth/`.
 - **Learned:** Git Bash's GNU `tar -a` silently writes a plain tar named `.zip`. Use `C:\Windows\System32\tar.exe` for
   real zips.
 
