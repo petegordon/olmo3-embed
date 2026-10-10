@@ -1,6 +1,6 @@
 # Data card: olmo3-embed training data
 
-**Status: Track B v1, in progress (2026-10-05).** Ingest and decontamination are done. Hard-negative rescoring and
+**Status: Track B v1 (2026-10-05); task-variety V1, V2 and the Phase 6 PubMedQA slice added 2026-10-09.** Ingest and decontamination are done. Hard-negative rescoring and
 the LLM judge pass are still to come (`docs/phase3-plan.md` §4); this card gets updated after each step.
 
 ## Track B v1: sources
@@ -130,8 +130,64 @@ rows) is why ClimateFEVER counts as only partly held out. **Track A will drop al
 
 **Consequence for Track B v1:** see the plan's progress notes (§4b decision).
 
+## Task-variety sources (Phase 5, 2026-10-07)
+Built by `python -m olmo3_embed.data.build_variety` (V1) and `synth.py` (V2); same schema as Track B. Queries are
+checked by `decontam.py` and passages by `doc_decontam.py`. Negatives are mined by `rescore.py` (Qwen3-Embedding-0.6B)
+within each task's own pool. Plan and results: `docs/task-variety-plan.md`.
+
+| Source | Task | License | Rows in | Query drops | Passage drops | Rows out |
+|---|---|---|---:|---:|---:|---:|
+| `flax-sentence-embeddings/stackexchange_title_body_jsonl`, 80 sites × 1,000 (12 CQADupStack forums excluded) | StackExchange | CC BY-SA 4.0 | 80,000 | 47: 44 FiQA, 3 Quora | 19 (CQADupStack docs) + 956 (rest of money.stackexchange) | 78,978 |
+| `sentence-transformers/s2orc` title-citation pairs (SCIDOCS titles removed at ingest: 320) | S2ORCCitation | ODC-By 1.0 | 60,000 | 0 | 16 (TREC-COVID docs) | 59,984 |
+| Hansard speeches + Claude/Codex questions | SynthArgument | CC-BY-4.0 / Open Parliament Licence | 4,000 | 3 (Touche2020 queries) | 0 | 3,997 |
+| Hansard speeches + Claude/Codex counter-arguments | SynthCounterArgument | as above | 3,992 | 0 | 0 | 3,992 |
+
+- **What leaked:** money.stackexchange questions are FiQA-2018's source (44 exact test queries), so the site's other
+  956 rows were removed as well, and `build_variety.py` now excludes it at ingest. 16 S2ORC citation titles are CORD-19 papers in TREC-COVID's corpus. 3 LLM-written debate
+  questions matched Touche2020 test queries word for word.
+- **Used in training:** run #2 (7B) used Track B v1 + V1 + V2 at 96k rows. V2b (stance negatives), V3 (entity and
+  climate) and V3b were tested on the 1B proxy and not adopted.
+
+## Phase 6: PubMedQA biomedical slice (2026-10-09)
+- **Source:** `qiaojin/PubMedQA` `pqa_artificial` (MIT; 211,269 rows). 30,000 sampled (seed 0), one row per PubMed
+  id. Query: a research question generated from the paper's title. Positive: the paper's full abstract, the context
+  paragraphs plus the conclusion (median 1,633 characters). Built by `build_variety.py --sources pubmedqa`.
+- **Target:** TREC-COVID-shaped retrieval (question → biomedical abstract), the largest gap in run #2's 8-task BEIR
+  subset (65.9 vs 80.3 for LLM2Vec-Llama-3-8B).
+- **Zero-shot protocol for TREC-COVID** (decided 2026-10-09): no TREC-COVID queries or qrels, and no document overlap
+  with its 171,332 CORD-19 documents, nor with NFCorpus or SciFact, which are PubMed-derived too.
+
+| Check | Rows dropped |
+|---|---:|
+| Query exact / near-duplicate vs 72,055 test queries (39 tasks) | 0 |
+| `doc_prefix` (TREC-COVID) | 2 |
+| `pos_near` (NanoNFCorpus positives) | 3 |
+| **`doc_contain`** (≥5% of word 8-grams in a full corpus): TREC-COVID 159, NFCorpus 15, SciFact 12 | **186** |
+| **Rows out** | **29,809** |
+
+- **Independent re-check:** after these rules, 0 rows have ≥5% of their 8-grams in any of the three corpora.
+- **Release:** `data-variety-bio-v1` (`variety_bio_clean.parquet` and its reports). Negatives are mined on Colab from
+  the PubMedQA abstract pool (`data/variety_bio/rescored.parquet` on Drive).
+- **Status:** on trial in the 1B proxy `p6-bio`, compared with `p5-v2i`. 7B run #3 uses it only if the proxy gate
+  passes.
+
+## Document-level decontamination rules (`doc_decontam.py`, index v2)
+| Rule | Matches | Against |
+|---|---|---|
+| `doc_exact` / `doc_prefix` | Same normalized text, or the same first 200 normalized chars | Every document of the full test corpora: Touche-2020, ArguAna, SCIDOCS, CQADupStack (12), Quora, TREC-COVID, FiQA, SciFact, NFCorpus. For TREC-COVID, NFCorpus and SciFact also the title alone and the abstract alone |
+| `pos_near` | MinHash over word 3-grams of the first 300 chars, Jaccard ≥ 0.8 | Test-qrel positive documents of all 39 test sets (covers the Wikipedia-based tasks) |
+| `doc_near` | Same MinHash rule | Every document of TREC-COVID, NFCorpus and SciFact |
+| `doc_contain` | ≥5% of the passage's word 8-grams occur anywhere in the corpus | Every document of TREC-COVID, NFCorpus and SciFact |
+
+- **Why `doc_contain` exists:** CORD-19 stores "title + section label + abstract" while PubMed sources carry the bare
+  abstract. The text is the same but offset, so exact, prefix and first-300-character MinHash matching all miss it.
+  On PubMedQA, the first three rules caught 5 rows. `doc_contain` caught 186 more, 139 of them with ≥50% overlap.
+- **Not yet applied retroactively:** V1 and V2 were checked with the first two rules only (index v1). See "Still to add".
+
 ## Still to add
 - LLM judge pass on Quora, SciFact and NFCorpus: OLMo-3.1-32B-Instruct for the bulk, Claude to verify, Codex and Gemini
   to break ties. Per-judge agreement goes here.
 - Final per-task row counts and the sampling temperature used in training.
 - A Dolma 3 contamination check (Phase 6).
+- Re-check V1 and V2 with index v2 (`doc_near`, `doc_contain`) before 7B run #3, which trains on them.
+- PubMedQA rescoring stats (negatives per row, guard rate) once `p6-bio` has mined them.
