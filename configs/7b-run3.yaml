@@ -1,0 +1,29 @@
+# Phase 6 → 7B run #3 (worklog, "Phase 6"): run #2's recipe + the PubMedQA biomedical slice (release
+# data-variety-bio-v1, 29,809 rows, zero document overlap with TREC-COVID / NFCorpus / SciFact). Launch only if the
+# 1B proxy gate passes (p6-bio vs p5-v2i on full TREC-COVID, no drop on SciFact / NFCorpus, in-domain within ±1).
+# 115k rows (run #2: 96k) so the new slice comes on top of Track B's share instead of out of it.
+# GPU memory knobs (gradient_checkpointing, chunk_size) are set per runtime by the notebook's timing cell.
+run_name: p6-run3-7b
+model: allenai/Olmo-3-1025-7B
+data: data/trackb_v1/rescored.parquet,data/variety_v1/rescored.parquet,data/variety_v2/rescored.parquet,data/variety_bio/rescored.parquet
+n_examples: 115000
+pooling: last
+bidirectional: false
+instructions: true
+instruction_mode: per_task
+instruction_dropout: 0.2
+task_batching: true
+task_temperature: 0.5
+neg_pool: 10
+mask_false_negatives: true
+max_len_query: 64
+max_len_doc: 256
+num_negatives: 3
+temperature: 0.02
+batch_size: 128
+lora_r: 16
+lora_alpha: 32
+lr: 1.0e-4
+warmup_ratio: 0.05
+seed: 0
+save_every: 10           # ~8 min of 7B steps: a lost runtime costs at most that
