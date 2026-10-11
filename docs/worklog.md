@@ -466,6 +466,34 @@ quarters of their top 10 with them.
 - **Implication:** recovering TREC-COVID means teaching the 7B to rank a full abstract above a bare title on the same
   topic. That optimizes against a pool artefact more than it improves retrieval.
 
+**7B run #3: run #2's recipe on the cleaned data (Oct 10, 15:12 – Oct 11, 09:10; cybercontext, A100 80GB, ~121 units):**
+`configs/7b-run3.yaml`, `notebooks/phase6_7b_run3_colab.ipynb`: Track B + V1 + V2 + PubMedQA, all cleaned copies (no
+document overlap with the zero-shot test corpora), 115k rows, 892 steps at ~47 s/step (11.7 h), then 4.5 h of evals.
+
+| Task (full size) | Run #3 (clean) | Run #2 | Δ |
+|---|---:|---:|---:|
+| ArguAna | 61.38 | 60.45 | +0.93 |
+| SCIDOCS | 23.29 | 23.81 | −0.53 |
+| NFCorpus | 37.46 | 39.66 | −2.20 |
+| SciFact | 80.21 | 79.55 | +0.66 |
+| FiQA | 53.18 | 52.88 | +0.30 |
+| Quora | 89.59 | 89.76 | −0.17 |
+| TREC-COVID | 60.16 | 65.90 | **−5.74** |
+| CQADupstack | 45.45 | 46.16 | −0.71 |
+| **8-task average** | **56.34** (rank 36/139) | 57.27 (rank 30) | −0.93 |
+| BEIR-15 estimate (fit) | ~54.1 (rank ~42) | ~55.1 (rank ~33) | |
+| ClimateFEVER-HN / DBPedia-HN | 34.52 / 49.95 | 34.44 / 49.81 | +0.08 / +0.15 |
+
+- **Most of the drop is TREC-COVID, where run #2 trained on test documents.** Run #2's uncleaned Track B had 494 rows
+  whose positive is a TREC-COVID test document. Without them, TREC-COVID falls 5.7 points. So part of run #2's 65.90
+  was overlap, not zero-shot skill. Run #3's numbers are the honest ones and the submission candidate.
+- **Elsewhere the two runs are close** (7-task average without TREC-COVID: 55.80 vs 56.04). The PubMedQA slice didn't
+  lift NFCorpus or SCIDOCS at 7B.
+- **Ops:** the Mac's websocket dropped twice during the evals; attempt 3's `colab exec` hung at "Parsing notebook"
+  from 05:20 while the attempt-2 eval kept running in the kernel (status showed IDLE). I stopped the driver, waited
+  for the result files with `colab ls`, fetched them with `colab download`, and pushed from the Mac. Lesson: a
+  re-exec while the kernel still runs the old cell blocks silently; check `colab ls` for progress before re-execing.
+
 **Learned:** headless Colab works end to end and needs no tab, but each runtime still costs one human consent click
 for Drive. The HF storage plan (`docs/colab-hf-storage-plan.md`) would remove that: an HF token goes up like the GitHub
 token, with no consent.
