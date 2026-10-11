@@ -513,6 +513,13 @@ exact average of the two runs' LoRA updates (`olmo3_embed.merge`, rank concatena
   smaller than that, measured on one seed, aren't real.
 - **Decision:** no second 7B run just to merge with run #3.
 
+**Phase 7 step 2: 7B run #4, run #3 without V2 (launched Oct 11, 12:35; cybercontext, A100 80GB; ~110 units est.):**
+`configs/7b-run4.yaml`, `notebooks/phase7_7b_run4_colab.ipynb`. Drops V2, the ~8k Claude/Codex-written Hansard rows, so
+every training row is human-written public data: the candidate for a public model. 115k rows, 893 steps (~11.5 h), then
+Nano + held-out + 8-task BEIR (~4.5 h). The notebook now writes a Drive heartbeat (`runs/p7-run4-7b.heartbeat`, busy or
+idle), and the driver waits for "idle" before re-executing after a dropped connection. Results to follow.
+Also on Oct 11: PLAN.md status section (pre-public checklist, BEIR-15 blocker) and an Apache-2.0 LICENSE.
+
 **Learned:** headless Colab works end to end and needs no tab, but each runtime still costs one human consent click
 for Drive. The HF storage plan (`docs/colab-hf-storage-plan.md`) would remove that: an HF token goes up like the GitHub
 token, with no consent.
