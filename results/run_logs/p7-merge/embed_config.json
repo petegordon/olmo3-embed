@@ -1,0 +1,20 @@
+{
+  "model": "allenai/OLMo-2-0425-1B",
+  "run_name": "p7-merge",
+  "pooling": "last",
+  "bidirectional": false,
+  "instructions": true,
+  "instruction_mode": "per_task",
+  "dtype": "bfloat16",
+  "steps": null,
+  "merged_from": [
+    {
+      "run": "p5-v2i",
+      "weight": 0.5
+    },
+    {
+      "run": "p7-s1",
+      "weight": 0.5
+    }
+  ]
+}
