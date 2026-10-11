@@ -494,6 +494,25 @@ document overlap with the zero-shot test corpora), 115k rows, 892 steps at ~47 s
   for the result files with `colab ls`, fetched them with `colab download`, and pushed from the Mac. Lesson: a
   re-exec while the kernel still runs the old cell blocks silently; check `colab ls` for progress before re-execing.
 
+**Phase 7 step 1: merging two 1B runs doesn't help (Oct 11, 09:58–12:16; cybercontext, A100 40GB, ~12.9 units):**
+`notebooks/phase7_merge_proxy_colab.ipynb`. p7-s1 = p5-v2i's recipe with seed 1 (different rows and order); p7-merge = the
+exact average of the two runs' LoRA updates (`olmo3_embed.merge`, rank concatenation, checked to 1e-7).
+
+| | p5-v2i (seed 0) | p7-s1 (seed 1) | p7-merge |
+|---|---:|---:|---:|
+| heldout-4 (full size) | 37.92 | 37.42 | 37.94 |
+| Nano avg-13 | 63.08 | 63.37 | 62.93 |
+| Nano avg-in-8 | 70.70 | 71.70 | 70.22 |
+| NFCorpus / SciFact | 36.39 / 75.22 | 37.16 / 75.97 | 36.74 / 75.03 |
+| ArguAna / SCIDOCS | 56.11 / 19.73 | 54.18 / 19.60 | 54.93 / 19.70 |
+| ClimateFEVER-HN / DBPedia-HN | 31.14 / 44.68 | 31.61 / 44.30 | 32.43 / 44.68 |
+
+- **Gate fails.** The merge ties the better run on heldout-4 (+0.02) and is 0.44 below it on Nano avg-13. It lands at
+  about the average of the two runs, not above them.
+- **Seed noise is about 0.5 points** (heldout-4 37.92 vs 37.42; Nano avg-in-8 70.70 vs 71.70). Recipe differences
+  smaller than that, measured on one seed, aren't real.
+- **Decision:** no second 7B run just to merge with run #3.
+
 **Learned:** headless Colab works end to end and needs no tab, but each runtime still costs one human consent click
 for Drive. The HF storage plan (`docs/colab-hf-storage-plan.md`) would remove that: an HF token goes up like the GitHub
 token, with no consent.
