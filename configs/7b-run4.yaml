@@ -1,0 +1,33 @@
+# Phase 7 → 7B run #4 (worklog, "Phase 7"): run #3's recipe without V2, the Claude/Codex-written Hansard questions
+# (~8k rows). Every training row is then human-written public data (Track B, StackExchange, S2ORC, PubMedQA), all
+# cleaned copies with no document overlap with the zero-shot test corpora. V2's measured gain (+0.66 heldout-4 on the
+# 1B) was within seed noise (~0.5, Phase 7 step 1). 115k rows → 893 steps; the freed share goes to the other tasks.
+# GPU memory knobs (gradient_checkpointing, chunk_size) are set per runtime by the notebook's timing cell.
+run_name: p7-run4-7b
+model: allenai/Olmo-3-1025-7B
+# Cleaned copies (Phase 6 cleanup, Oct 9): rows whose positive overlaps a zero-shot test corpus dropped, overlapping
+# negatives removed (doc_decontam index v2: near-dup + 8-gram containment vs TREC-COVID/NFCorpus/SciFact/SCIDOCS).
+# trackb_v1c: only TREC-COVID, SCIDOCS, ArguAna, Touche2020, CQADupStack overlap removed (by-design overlap with BEIR
+# tasks that have a train split is kept, as in runs #1-2). variety_v2 needed no change.
+data: data/trackb_v1c/rescored.parquet,data/variety_v1c/rescored.parquet,data/variety_bioc/rescored.parquet
+n_examples: 115000
+pooling: last
+bidirectional: false
+instructions: true
+instruction_mode: per_task
+instruction_dropout: 0.2
+task_batching: true
+task_temperature: 0.5
+neg_pool: 10
+mask_false_negatives: true
+max_len_query: 64
+max_len_doc: 256
+num_negatives: 3
+temperature: 0.02
+batch_size: 128
+lora_r: 16
+lora_alpha: 32
+lr: 1.0e-4
+warmup_ratio: 0.05
+seed: 0
+save_every: 10           # ~8 min of 7B steps: a lost runtime costs at most that
