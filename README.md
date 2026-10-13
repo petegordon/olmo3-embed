@@ -8,4 +8,11 @@ A fully open text-embedding model built on [OLMo 3](https://huggingface.co/allen
 - **[docs/worklog.md](docs/worklog.md)** is the running diary; **[docs/petes-learning.md](docs/petes-learning.md)** explains terms and concepts as they come up.
 - Leaderboard snapshot: `docs/beir_snapshot_2026-10-04.csv`, regenerated with `uv run scripts/beir_snapshot.py`.
 
-Status: Phase 0 (scaffold).
+## Status (2026-10-13)
+
+Best model: 7B run #4 (`configs/7b-run4.yaml`), a LoRA adapter on OLMo-3-7B trained on human-written public data only,
+decontaminated against the BEIR test sets (see [docs/data-card.md](docs/data-card.md)).
+
+- **56.48** average nDCG@10 on 8 of the 15 BEIR tasks (ArguAna, SCIDOCS, NFCorpus, SciFact, FiQA, Quora, TREC-COVID,
+  CQADupStack). Estimated full-BEIR rank: about #35–40 on the leaderboard.
+- Full 15-task BEIR eval, model weights and the leaderboard submission are still to come.
