@@ -32,18 +32,51 @@ INSTRUCTION_TEMPLATE = "Instruct: {instruction}\nQuery: {text}"
 
 # ---------------------------------------------------------------- shared forward pass (train + eval)
 
-def tokenize(tokenizer, texts: list[str], pooling: str, max_length: int) -> dict[str, torch.Tensor]:
+def token_ids(tokenizer, texts: list[str], pooling: str, max_length: int) -> list[list[int]]:
     eos = tokenizer.eos_token_id
     if pooling == "mean":
         ids = tokenizer(texts, truncation=True, max_length=max_length)["input_ids"]
         # Empty docs exist (NanoFiQA2018 has 27) and OLMo adds no BOS, so they'd be 0 tokens; a batch of only
         # empties (length-sorted batching puts them together) then crashes attention. Encode them as [EOS].
-        ids = [x or [eos] for x in ids]
-    else:
-        # last-token: truncate leaving room for EOS, append it, then pad on the right
-        ids = tokenizer(texts, truncation=True, max_length=max_length - 1)["input_ids"]
-        ids = [x + [eos] for x in ids]
+        return [x or [eos] for x in ids]
+    # last-token: truncate leaving room for EOS, append it (padding goes on the right)
+    ids = tokenizer(texts, truncation=True, max_length=max_length - 1)["input_ids"]
+    return [x + [eos] for x in ids]
+
+
+def tokenize(tokenizer, texts: list[str], pooling: str, max_length: int) -> dict[str, torch.Tensor]:
+    ids = token_ids(tokenizer, texts, pooling, max_length)
     return tokenizer.pad({"input_ids": ids}, padding=True, return_tensors="pt")
+
+
+class DocEmbeddingCache:
+    """Document embeddings keyed by a hash of the text, stored float16 in a preallocated memmap on local disk.
+
+    FEVER and ClimateFEVER share one 5.4M-passage Wikipedia corpus, so evaluating them in one process with this cache
+    embeds it once (~20 A100-hours saved). Lives for one process only; documents past `capacity` just aren't cached.
+    """
+
+    def __init__(self, path: str, dim: int, capacity: int):
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        self.emb = np.lib.format.open_memmap(path, mode="w+", dtype=np.float16, shape=(capacity, dim))
+        self.rows: dict[bytes, int] = {}
+        self.hits = self.misses = 0
+
+    @staticmethod
+    def key(text: str) -> bytes:
+        import hashlib
+
+        return hashlib.blake2b(text.encode("utf-8", "surrogatepass"), digest_size=16).digest()
+
+    def get(self, keys: list[bytes]) -> list[int | None]:
+        return [self.rows.get(k) for k in keys]
+
+    def put(self, keys: list[bytes], emb: np.ndarray) -> None:
+        for k, e in zip(keys, emb):
+            if k in self.rows or len(self.rows) >= len(self.emb):
+                continue
+            self.rows[k] = len(self.rows)
+            self.emb[self.rows[k]] = e
 
 
 def bidirectional_mask(attention_mask: torch.Tensor, dtype: torch.dtype) -> torch.Tensor:
@@ -98,12 +131,18 @@ class OlmoEmbedder(AbsEncoder):
         device: str | None = None,
         load_in_4bit: bool = False,
         batch_size: int = 32,
+        token_budget: int | None = None,
+        doc_cache: DocEmbeddingCache | None = None,
     ):
         if pooling not in ("mean", "last"):
             raise ValueError(pooling)
         self.pooling, self.instructions, self.bidirectional = pooling, instructions, bidirectional
         self.max_length = max_length
         self.batch_size = batch_size  # adaptive: halved on CUDA OOM
+        # token_budget: batch by padded tokens (rows x longest row) instead of a fixed row count, so short documents
+        # go in big batches. None keeps the fixed batch_size (the setting all results before 2026-10-13 used).
+        self.token_budget = token_budget
+        self.doc_cache = doc_cache
         self.device = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
         self.tokenizer, model = load_base(model_name, dtype, revision, load_in_4bit)
         if adapter:
@@ -164,6 +203,26 @@ class OlmoEmbedder(AbsEncoder):
         texts = [str(t) for batch in inputs for t in batch["text"]]
         if instruction:
             texts = [INSTRUCTION_TEMPLATE.format(instruction=instruction, text=t) for t in texts]
+        if self.doc_cache is not None and prompt_type == PromptType.document:
+            keys = [DocEmbeddingCache.key(t) for t in texts]
+            rows = self.doc_cache.get(keys)
+            miss = [i for i, r in enumerate(rows) if r is None]
+            out = np.empty((len(texts), self.model.config.hidden_size), dtype=np.float32)
+            hit = [i for i, r in enumerate(rows) if r is not None]
+            if hit:
+                out[hit] = self.doc_cache.emb[[rows[i] for i in hit]].astype(np.float32)
+            if miss:
+                emb = self._encode_texts([texts[i] for i in miss])
+                out[miss] = emb
+                self.doc_cache.put([keys[i] for i in miss], emb)
+            self.doc_cache.hits += len(hit)
+            self.doc_cache.misses += len(miss)
+            return out
+        return self._encode_texts(texts)
+
+    def _encode_texts(self, texts: list[str]) -> np.ndarray:
+        if self.token_budget:
+            return self._encode_budget(texts)
         # Encode longest-first in length-sorted batches: minimal padding, and any OOM surfaces on the first batch,
         # where we halve the batch size and retry (it stays halved for the rest of the run).
         order = sorted(range(len(texts)), key=lambda i: -len(texts[i]))
@@ -182,3 +241,36 @@ class OlmoEmbedder(AbsEncoder):
                 continue
             s += len(idx)
         return out
+
+    def _encode_budget(self, texts: list[str]) -> np.ndarray:
+        """Tokenize once, sort longest-first, and fill each batch up to token_budget padded tokens."""
+        ids = token_ids(self.tokenizer, texts, self.pooling, self.max_length)
+        order = sorted(range(len(ids)), key=lambda i: -len(ids[i]))
+        out = np.empty((len(texts), self.model.config.hidden_size), dtype=np.float32)
+        s = 0
+        while s < len(order):
+            longest = len(ids[order[s]])  # sorted: the first row is the longest in the batch
+            idx = order[s : s + max(1, self.token_budget // longest)]
+            try:
+                enc = self.tokenizer.pad({"input_ids": [ids[i] for i in idx]}, padding=True, return_tensors="pt")
+                with torch.no_grad():
+                    emb = embed_batch(self.model, enc.to(self.device), self.pooling, self.bidirectional)
+                out[idx] = emb.cpu().numpy()
+            except torch.OutOfMemoryError:
+                if self.token_budget <= self.max_length:
+                    raise
+                torch.cuda.empty_cache()
+                self.token_budget //= 2
+                print(f"[OlmoEmbedder] CUDA OOM -> token_budget {self.token_budget}", flush=True)
+                continue
+            s += len(idx)
+        return out
+
+    def similarity(self, embeddings1, embeddings2) -> torch.Tensor:
+        """Cosine similarity on the GPU in float32 (same math as mteb's cos_sim; the CPU matmul of ~7k queries
+        against each 50k-document chunk is otherwise minutes per chunk on full BEIR)."""
+        a = torch.as_tensor(embeddings1, dtype=torch.float32, device=self.device)
+        b = torch.as_tensor(embeddings2, dtype=torch.float32, device=self.device)
+        a = torch.nn.functional.normalize(a, dim=-1)
+        b = torch.nn.functional.normalize(b, dim=-1)
+        return (a @ b.T).cpu()

@@ -48,6 +48,11 @@ def main():
     ap.add_argument("--run-instructions", choices=["on", "off"],
                     help="--run: override the run's own instruction setting (diagnostics); results get a name suffix")
     ap.add_argument("--name-suffix", help="--run: results folder olmo3-embed__<run_name><suffix> (keeps variants apart)")
+    ap.add_argument("--token-budget", type=int,
+                    help="OlmoEmbedder: batch by padded tokens instead of --batch-size rows (faster on short docs)")
+    ap.add_argument("--doc-cache", help="OlmoEmbedder: float16 document-embedding cache file on local disk, shared by "
+                                        "the tasks of this process (FEVER + ClimateFEVER share a corpus)")
+    ap.add_argument("--doc-cache-capacity", type=int, default=6_000_000, help="rows in --doc-cache")
     ap.add_argument("--predictions", help="save per-query rankings here (mteb prediction_folder), e.g. for judged@10")
     args = ap.parse_args()
 
@@ -70,7 +75,7 @@ def main():
             run_name = _json.load(open(_os.path.join(args.run, "embed_config.json")))["run_name"] + suffix
         model = OlmoEmbedder.from_run(
             args.run, max_length=args.max_seq_length or 512, batch_size=args.batch_size, dtype=args.dtype,
-            instructions=instr, run_name=run_name,
+            instructions=instr, run_name=run_name, token_budget=args.token_budget,
         )
     elif args.olmo_pooling:
         from olmo3_embed.model import OlmoEmbedder
@@ -78,13 +83,17 @@ def main():
         model = OlmoEmbedder(
             args.model, pooling=args.olmo_pooling, instructions=not args.no_instructions,
             dtype=args.dtype or "bfloat16", max_length=args.max_seq_length or 512, load_in_4bit=args.load_in_4bit,
-            batch_size=args.batch_size,
+            batch_size=args.batch_size, token_budget=args.token_budget,
         )
     else:
         kwargs = {"model_kwargs": {"torch_dtype": args.dtype}} if args.dtype else {}
         if args.max_seq_length:
             kwargs["max_seq_length"] = args.max_seq_length
         model = mteb.get_model(args.model, **kwargs)  # registered ModelMeta (prompts, pooling) when available
+    if args.doc_cache:
+        from olmo3_embed.model import DocEmbeddingCache
+
+        model.doc_cache = DocEmbeddingCache(args.doc_cache, model.model.config.hidden_size, args.doc_cache_capacity)
     mteb.evaluate(
         model,
         tasks,
@@ -93,6 +102,10 @@ def main():
         overwrite_strategy="only-missing",
         **({"prediction_folder": args.predictions} if args.predictions else {}),
     )
+
+
+    if args.doc_cache:
+        print(f"doc cache: {model.doc_cache.hits} hits, {model.doc_cache.misses} misses", flush=True)
 
 
 if __name__ == "__main__":
