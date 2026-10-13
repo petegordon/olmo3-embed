@@ -387,7 +387,7 @@ were re-checked against the new index (`doc_near` + `doc_contain` over TREC-COVI
 - **Learned:** re-check *all* training sources whenever the decontamination rules get stronger. A rule that is new
   for one source is new for the others too.
 
-**Phase 6 step 2: p6-bio proxy gate (Oct 9, 21:38 – Oct 10, 00:13; petegordonusa, A100 40GB, ~13.9 units):**
+**Phase 6 step 2: p6-bio proxy gate (Oct 9, 21:38 – Oct 10, 00:13; personal account, A100 40GB, ~13.9 units):**
 p5-v2i's exact recipe plus the PubMedQA slice (`notebooks/phase6_bio_proxy_colab.ipynb`), against p5-v2i scored on the
 same full-size tasks.
 
@@ -408,7 +408,7 @@ same full-size tasks.
   specific to run #2 depresses it. Prime suspect: V1, which run #2 trained on and p5-v2i didn't, and whose negatives
   include ~4,700 CORD-19 titles (found by the index-v2 cleanup), teaching the model to push TREC-COVID documents
   away. Diagnostic running: B3 (Track B only) vs p5-v1 (Track B + V1) on full TREC-COVID.
-- **Diagnostic (Oct 10, 04:21–04:57, petegordonusa, ~3 units): V1 is not the cause.** Full TREC-COVID: B3 (Track B)
+- **Diagnostic (Oct 10, 04:21–04:57, personal account, ~3 units): V1 is not the cause.** Full TREC-COVID: B3 (Track B)
   72.80, p5-v1 (Track B + V1) 74.02, p5-v2i (Track B + V2, instructions) 79.80, p6-bio 80.56, 7B run #2 65.90. V1's
   CORD-19 negatives didn't depress TREC-COVID at 1B (+1.2). Instructions + V2 lift the 1B by ~7. The 7B, on the same
   kinds of data with instructions, is 14 below the 1B: the cause is specific to the 7B. Next suspects: the 7B's
@@ -416,7 +416,7 @@ same full-size tasks.
   unjudged CORD-19 papers is scored as wrong). `eval.py` now has `--run-instructions on|off`, `--name-suffix` and
   `--predictions` (saved rankings, for a judged@10 check).
 
-**Phase 6 diagnostic 2: what holds the 7B down on TREC-COVID (Oct 10, 06:05–08:47; petegordonusa, A100 40GB, ~14.2 units):**
+**Phase 6 diagnostic 2: what holds the 7B down on TREC-COVID (Oct 10, 06:05–08:47; personal account, A100 40GB, ~14.2 units):**
 Run #2 on full TREC-COVID twice, rankings saved (`notebooks/phase6_treccovid_7b_colab.ipynb`, `eval.py
 --run-instructions/--name-suffix/--predictions`), then `scripts/judged_at_k.py` on the Mac.
 
@@ -442,7 +442,7 @@ Run #2 on full TREC-COVID twice, rankings saved (`notebooks/phase6_treccovid_7b_
   both markers, and the driver deleted the runtime. The driver now stops instead of retrying after a cell fails
   without a dropped connection.
 
-**Phase 6 diagnostic 3: the title-only pull comes from the 7B base, not V1 (Oct 10, 09:14–10:50; petegordonusa, A100 40GB, ~9 units):**
+**Phase 6 diagnostic 3: the title-only pull comes from the 7B base, not V1 (Oct 10, 09:14–10:50; personal account, A100 40GB, ~9 units):**
 
 Full TREC-COVID rankings for the 1B p5-v2i and 7B run #1 (`notebooks/phase6_treccovid_rank_colab.ipynb`),
 compared with run #2's saved rankings.

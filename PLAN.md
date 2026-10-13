@@ -178,7 +178,7 @@ ablation on the 1B proxy locally with NanoBEIR first. Truncating depth (§3) is 
   submittable: their training data overlaps the zero-shot test corpora (data card, "Applied retroactively").
 - **Compute:** cybercontext has ~32 units left (2026-10-13), not enough for BEIR-15.
 - **Full BEIR-15 is the blocker for Ship:** ~250–350 A100 units (measured eval throughput; the §5 estimate was ~10× low).
-  Plan: Pete's Colab upgrade on petegordonusa; first check whether 256-token documents (the training length) halve the
+  Plan: Pete's Colab upgrade on the personal account; first check whether 256-token documents (the training length) halve the
   cost without lowering scores, on 2 tasks.
 - **Before making the repo public:** delete release `beir-test-cache-v1` (test data), keep the synthetic-data releases
   (`data-variety-synth-v1`, `drive-data-v1`) private or removed until the providers' terms are checked. LICENSE added (Apache-2.0).
