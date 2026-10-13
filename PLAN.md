@@ -168,18 +168,20 @@ ablation on the 1B proxy locally with NanoBEIR first. Truncating depth (§3) is 
 | **1. Baselines** ✅ 2026-10-04 | local + Colab | Untrained NanoBEIR: OLMo-3-7B mean **17.35**, OLMo-2-1B mean 15.32, EOS-last ≈0 (random); refs bge-base 63.76, Qwen3-0.6B 65.66. See `docs/phase1-baselines.md` | **Passed:** harness validated (Phase 0); proxy profile tracks the 7B |
 | **2. Recipe on proxy** ✅ 2026-10-05 | Colab A100 | OLMo-2-1B, 7 arms. Best: **EOS-last + no instructions, 57.51** avg-12 (mean-pool base 41.91; EOS-last alone 54.76). Bidirectional hurts with EOS (−10.4), so it's dropped; k=1 ≈ k=3. See `docs/phase2-results.md` | **Passed** (16.25 → 57.51). Top 2: a8 (last, no instr), a1 (last, instr) |
 | **3. Data** ✅ Track B 2026-10-06 (Track A + synthetic pending) | local + Colab | Track B v1: 373,762 decontaminated rows, Qwen3-rescored negatives. 1B proxy on 64k rows: **62.28** avg-13 (a8: 57.48), held-out **49.35** (46.02). Rescore +1.65; instructions −4.6. See `docs/phase3-results.md`, `docs/data-card.md` | **Passed:** zero test overlap; beats a8 on avg-13 and held-out |
-| **4. 7B runs** 🔶 #1–#3 done (2026-10-07 to 10-11) | Colab A100 | #1 Track B (NanoBEIR 65.93). #2 + V1 + V2 + per-task instructions: 8-task BEIR **57.27**, but trained on uncleaned data (TREC-COVID test documents among positives). #3 = #2 on cleaned data + PubMedQA: **56.34** (rank 36/139 on 8 tasks; BEIR-15 est. ~54.1, rank ~40). See `docs/worklog.md` | Full BEIR ≥ **T1 56.6**: not yet (est. ~2.5 short) |
-| **5. Iterate** 🔶 | Colab | Done: task-variety data (V1 StackExchange + S2ORC, V2 synthetic, PubMedQA), document-level decontamination (index v2), TREC-COVID diagnostics (title-only pull follows the OLMo-3-7B base), checkpoint merging (1B: no gain, seed noise ~0.5). In progress: run #4 = run #3 without V2 (all human-written public data). Not tried: depth truncation, distillation, Matryoshka, 7 hard negatives / larger batch | Full BEIR ≥ **T2 59.5** |
+| **4. 7B runs** 🔶 #1–#4 done (2026-10-07 to 10-13) | Colab A100 | #1 Track B (NanoBEIR 65.93). #2 + V1 + V2 + per-task instructions: 8-task BEIR **57.27**, but trained on uncleaned data (TREC-COVID test documents among positives). #3 = #2 on cleaned data + PubMedQA: **56.34** (rank 36/139 on 8 tasks; BEIR-15 est. ~54.1, rank ~42). #4 = #3 without V2 (all human-written public data): **56.48** (rank 35; BEIR-15 est. ~54.2, rank ~39), a tie with #3 within seed noise. See `docs/worklog.md` | Full BEIR ≥ **T1 56.6**: not yet (est. ~2.4 short) |
+| **5. Iterate** 🔶 | Colab | Done: task-variety data (V1 StackExchange + S2ORC, V2 synthetic, PubMedQA), document-level decontamination (index v2), TREC-COVID diagnostics (title-only pull follows the OLMo-3-7B base), checkpoint merging (1B: no gain, seed noise ~0.5), dropping V2 (run #4: no loss). Not tried: depth truncation, distillation, Matryoshka, 7 hard negatives / larger batch | Full BEIR ≥ **T2 59.5** |
 | **6. Ship** | – | HF model card (training data, zero-shot stats, contamination report), `ModelMeta` PR to `embeddings-benchmark/mteb`, results PR to `embeddings-benchmark/results`, short write-up | Appears on the BEIR leaderboard |
 
-**Status and next steps (2026-10-11):**
-- **Submission candidate:** run #4 if it matches run #3 (no model-written data), else run #3. Runs #1 and #2 aren't
+**Status and next steps (2026-10-13):**
+- **Submission candidate: run #4** (`p7-run4-7b`). It ties run #3 (8-task +0.14, Nano avg-13 +0.09,
+  heldout-4 −0.34) and has no model-written training data, so no provider-terms question. Runs #1 and #2 aren't
   submittable: their training data overlaps the zero-shot test corpora (data card, "Applied retroactively").
+- **Compute:** cybercontext has ~32 units left (2026-10-13), not enough for BEIR-15.
 - **Full BEIR-15 is the blocker for Ship:** ~250–350 A100 units (measured eval throughput; the §5 estimate was ~10× low).
   Plan: Pete's Colab upgrade on petegordonusa; first check whether 256-token documents (the training length) halve the
   cost without lowering scores, on 2 tasks.
 - **Before making the repo public:** delete release `beir-test-cache-v1` (test data), keep the synthetic-data releases
-  (`data-variety-synth-v1`, `drive-data-v1`) private or removed until the providers' terms are checked, add a LICENSE.
+  (`data-variety-synth-v1`, `drive-data-v1`) private or removed until the providers' terms are checked. LICENSE added (Apache-2.0).
 - **Bigger levers for the next budget:** 7 hard negatives and/or a larger effective batch (~1.7× step cost at 7B),
   distillation from a cross-encoder, test on the 1B first with 2 seeds (seed noise ~0.5).
 

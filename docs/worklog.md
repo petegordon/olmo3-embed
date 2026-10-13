@@ -513,11 +513,40 @@ exact average of the two runs' LoRA updates (`olmo3_embed.merge`, rank concatena
   smaller than that, measured on one seed, aren't real.
 - **Decision:** no second 7B run just to merge with run #3.
 
-**Phase 7 step 2: 7B run #4, run #3 without V2 (launched Oct 11, 12:35; cybercontext, A100 80GB; ~110 units est.):**
+**Phase 7 step 2: 7B run #4, run #3 without V2 (Oct 11, 14:48 – Oct 13, 02:03; cybercontext, A100 80GB, ~120 units):**
 `configs/7b-run4.yaml`, `notebooks/phase7_7b_run4_colab.ipynb`. Drops V2, the ~8k Claude/Codex-written Hansard rows, so
-every training row is human-written public data: the candidate for a public model. 115k rows, 893 steps (~11.5 h), then
-Nano + held-out + 8-task BEIR (~4.5 h). The notebook now writes a Drive heartbeat (`runs/p7-run4-7b.heartbeat`, busy or
-idle), and the driver waits for "idle" before re-executing after a dropped connection. Results to follow.
+every training row is human-written public data. 115k rows, 893 steps, then Nano + held-out + 8-task BEIR.
+
+| Task (full size) | Run #4 (no V2) | Run #3 | Δ |
+|---|---:|---:|---:|
+| ArguAna | 57.82 | 61.38 | −3.56 |
+| SCIDOCS | 23.65 | 23.29 | +0.36 |
+| NFCorpus | 38.98 | 37.46 | +1.52 |
+| SciFact | 79.47 | 80.21 | −0.74 |
+| FiQA | 53.39 | 53.18 | +0.21 |
+| Quora | 89.66 | 89.59 | +0.07 |
+| TREC-COVID | 63.10 | 60.16 | +2.94 |
+| CQADupstack | 45.76 | 45.45 | +0.31 |
+| **8-task average** | **56.48** (rank 35/139) | 56.34 (rank 36) | +0.14 |
+| BEIR-15 estimate (fit) | ~54.2 (rank ~39) | ~54.1 (rank ~42) | |
+| ClimateFEVER-HN / DBPedia-HN | 36.39 / 49.92 | 34.52 / 49.95 | +1.87 / −0.03 |
+| heldout-4 | 41.95 | 42.29 | −0.34 |
+| Nano avg-13 | 66.33 | 66.24 | +0.09 |
+
+- **A tie.** Every average moves by less than the ~0.5 seed noise. V2 was worth nothing measurable at 7B.
+- **Per task, the swings cancel.** ArguAna drops 3.6 (V2's Hansard questions resemble its argument-retrieval style);
+  TREC-COVID gains 2.9, ClimateFEVER-HN 1.9 and NFCorpus 1.5. With one seed per run, single-task moves of this size
+  may be noise.
+- **Decision: run #4 is the submission candidate.** Same quality, and no model-written training data, so no question
+  about the providers' terms.
+- **Ops:** the Mac lost DNS at 21:20 on Oct 11 (step ~495). The driver's `colab sessions` check failed on the token
+  refresh and it exited as "runtime gone", while the runtime trained on alone until ~22:25 (step ~575) and was then
+  reclaimed. Resumed Oct 12, 15:58 on a new runtime from the step-570 Drive checkpoint; finished in one attempt.
+  Three consent links expired or broke before that (~8 units of idle runtime; one link was mistyped in transcription).
+  Fix: the driver now retries the sessions check for 30 min before deciding the runtime is gone. Lessons: create the
+  runtime only when Pete is ready to click; keep the Mac on power and Wi-Fi overnight.
+- Balance after run #4: ~32.6 units (cybercontext).
+
 Also on Oct 11: PLAN.md status section (pre-public checklist, BEIR-15 blocker) and an Apache-2.0 LICENSE.
 
 **Learned:** headless Colab works end to end and needs no tab, but each runtime still costs one human consent click
