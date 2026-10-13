@@ -217,7 +217,7 @@ laptop used Chrome.
 
 | Step | Took | Result |
 |---|---|---|
-| Install + sign in (oauth2, petegordonusa@gmail.com) | ~5 min | Its own token in `~/.config/colab-cli/`; gcloud/ADC untouched |
+| Install + sign in (oauth2, personal Google account) | ~5 min | Its own token in `~/.config/colab-cli/`; gcloud/ADC untouched |
 | CPU probes: secrets, `--env`, upload, Drive | ~15 min | Secrets don't work headless (see below) |
 | Drive wrapper + token script | ~10 min | `scripts/colab_drivemount.py`, `scripts/colab_secrets.sh` |
 | **A100 smoke** (`notebooks/colab_cli_smoke.ipynb`) | ~4 min GPU | A100-SXM4-40GB, token file read, Drive listed, clone OK; runtime deleted |
@@ -240,7 +240,7 @@ laptop used Chrome.
   isn't remembered). Under the CLI it waits for Enter on `/dev/tty`, while `drive.mount()` times out after 120 s.
   `scripts/colab_drivemount.py` waits for a signal file instead and gives the consent 20 min. Once mounted, the
   notebook's own `drive.mount()` just says "already mounted".
-- **Mac side:** Drive for desktop has petegordonusa@gmail.com, so `runs/` and `data/` are readable on the Mac (e.g. A's
+- **Mac side:** Drive for desktop has the personal Google account, so `runs/` and `data/` are readable on the Mac (e.g. A's
   final adapter appeared at 23:16). The VM can't see the Mac's copy.
 - `uv sync` failed on macOS (cu128 torch has no Mac wheels) → the CUDA index now applies only off macOS.
 

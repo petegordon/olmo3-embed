@@ -5,7 +5,7 @@ Paste everything below the line into the Claude desktop app (with Claude in Chro
 ---
 
 You're operating Google Colab in my Chrome on my behalf. Use the Chrome profile signed in as
-**petegordonusa@gmail.com**. If you're not in that profile/account, stop and ask me to switch.
+**the personal Google account that owns the Drive folder**. If you're not in that profile/account, stop and ask me to switch.
 
 **Goal:** run the Phase 2 notebook of my `olmo3-embed` project on an A100 and keep it running until it finishes,
 reporting progress to me. Don't edit any code. If anything differs from what's described here, stop and tell me
