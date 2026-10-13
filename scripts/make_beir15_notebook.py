@@ -40,7 +40,7 @@ try:
     for task in JOBS[JOB]:  # one process per task group so a failure in one doesn't lose the others
         tasks = task.split()
         cache = ' --doc-cache /content/doc_cache.npy' if task == 'FEVER ClimateFEVER' else ''
-        if task == CHECK: cache = ' --name-suffix -tbcheck'
+        if task == CHECK: cache = ' --name-suffix=-tbcheck'  # '=' or argparse reads -tbcheck as a flag
         log(f'start {task}')
         rc = sh(f'python -m olmo3_embed.eval --run runs/{RUN} --tasks {task} --max-seq-length 512 --batch-size 64 '
                 f'--token-budget {TOKEN_BUDGET}{cache} 2>&1 | grep -vE "it/s]|Warning"')
