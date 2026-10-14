@@ -49,8 +49,9 @@ instructions are each task's default MTEB prompt.
 |---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | **54.72** | 57.82 | 37.00 | 45.76 | 48.28 | 89.09 | 53.39 | 75.41 | 38.57 | 38.98 | 62.12 | 89.66 | 23.65 | 79.47 | 63.10 | 18.52 |
 
-MSMARCO is the dev split; the rest are test. Scored with mteb 2.22 in bf16 (the LoRA run before merging; the merged
-model was checked to reproduce SciFact and NFCorpus).
+MSMARCO is the dev split; the rest are test. Scored with mteb 2.22–2.24 in bf16 on the LoRA run before merging. This merged
+model, loaded through mteb, gives the same embeddings (cosine ≥ 0.9998 over all NFCorpus queries and 3,000 documents)
+and SciFact 79.44 / NFCorpus 38.78 (bf16 batching noise).
 
 ## Training data
 

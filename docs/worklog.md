@@ -601,6 +601,22 @@ lightonai/GTE-ModernColBERT-v1 54.75 and manveertamber/cadet-embed-base-v1 54.32
 **Learned:** plan every Colab job to finish within ~10 h. Job A lost ~11 h (~100 units) of MSMARCO to the runtime limit;
 splitting large corpora up front (or checkpointing embeddings) would have saved it.
 
+**Phase 9: Ship (Oct 14).**
+- **HF model:** [`petegordon/olmo3-embed-7b`](https://huggingface.co/petegordon/olmo3-embed-7b), public, Apache-2.0,
+  revision `ad1008e`. `scripts/export_hf.py` merges the LoRA (bf16, 13.8 GB) and saves a Sentence Transformers model:
+  EOS baked into the tokenizer's post-processor (same ids as `model.py`, truncation included), last-token pooling,
+  Normalize. Card: `hf/README.md`.
+- **Verification** through the proposed mteb loader (`hf/model_meta.py`, `InstructSentenceTransformerModel`): cosine
+  vs our encoder ≥ 0.9998 over all 323 NFCorpus queries and 3,000 docs; SciFact 79.44 (79.47), NFCorpus 38.78 (38.98,
+  bf16 batching noise: the 0.15 gate I set flagged it, the embedding check cleared it).
+- First export runtime vanished after ~28 min (KEEP set, no unassign; cause unknown, logs lost); the second attempt,
+  apparently on the same VM, found the export already on disk. ~6 units for Phase 9 so far (416 left).
+- **mteb ModelMeta** drafted (`mteb/models/model_implementations/olmo3_embed_models.py` in a clone): training_datasets =
+  MSMARCO, HotpotQA, NQ, FEVER, FiQA2018, NFCorpus, SciFact, QuoraRetrieval, so mteb rates it **46% zero-shot on
+  BEIR**. mteb's model-meta tests pass (3,723). Results folder for embeddings-benchmark/results re-labelled to
+  `petegordon__olmo3-embed-7b/ad1008e…` (26 task files + model_meta.json); mteb's ResultCache loads it as 15 BEIR tasks,
+  avg 54.72.
+
 Also on Oct 11: PLAN.md status section (pre-public checklist, BEIR-15 blocker) and an Apache-2.0 LICENSE.
 
 **Learned:** headless Colab works end to end and needs no tab, but each runtime still costs one human consent click
