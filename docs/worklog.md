@@ -585,6 +585,21 @@ Touche2020) are ~30M documents.
   `msmarco-shards-p7-run4-7b`. Then `scripts/merge_shards.py` scores the union with mteb, which equals a single
   full-corpus search: on SciFact (MiniLM, 3 shards) all 149 metrics were identical. S0 started at once; S1 and S2
   start when D and E free their slots (`queue_shards.sh` on the Mac).
+- **Night 2:** D = NQ **62.12** (4.9 h), E = DBPedia **48.28** (6.0 h). MSMARCO shards took 3.9 h each (S1 and S2
+  started at 03:06 and 04:08, as D and E freed their slots). `merge_shards.py` on the Mac (2 min): **MSMARCO 38.57**
+  (dev). D's SciFact/NFCorpus re-check ran but wasn't pushed: the log loop read `model_meta.json` (no scores) and its
+  KeyError ended the cell (fixed). Rerun on a G4 (~10 min): **SciFact 79.43, NFCorpus 38.94** vs 79.47 / 38.98 with
+  fixed batching, so token-budget batching doesn't move scores. Phase 8 total ~475 units (890 → ~415).
+
+**Run #4 BEIR-15 = 54.72** (estimate was ~54.2): **rank 37 of 140** 15-task models in the 2026-10-04 snapshot (between
+lightonai/GTE-ModernColBERT-v1 54.75 and manveertamber/cadet-embed-base-v1 54.32). T1 (56.6) missed by 1.88.
+
+| TRECCOVID | NFCorpus | NQ | HotpotQA | FiQA | ArguAna | Touche | CQADup | Quora | DBPedia | SCIDOCS | FEVER | ClimateFEVER | SciFact | MSMARCO |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 63.10 | 38.98 | 62.12 | 75.41 | 53.39 | 57.82 | 18.52 | 45.76 | 89.66 | 48.28 | 23.65 | 89.09 | 37.00 | 79.47 | 38.57 |
+
+**Learned:** plan every Colab job to finish within ~10 h. Job A lost ~11 h (~100 units) of MSMARCO to the runtime limit;
+splitting large corpora up front (or checkpointing embeddings) would have saved it.
 
 Also on Oct 11: PLAN.md status section (pre-public checklist, BEIR-15 blocker) and an Apache-2.0 LICENSE.
 

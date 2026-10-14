@@ -66,6 +66,7 @@ try:
                 f'--token-budget {TOKEN_BUDGET}{cache} 2>&1 | grep -vE "it/s]|Warning"')
         if task == CHECK:
             for f in sorted(glob.glob(f'results/results/olmo3-embed__{RUN}-tbcheck/*/*.json')):
+                if f.endswith('model_meta.json'): continue  # no scores (its KeyError ended job D before the push)
                 log(f'check {os.path.basename(f)[:-5]}: ' + str(round(100 * json.load(open(f))['scores']['test'][0]['ndcg_at_10'], 2)))
         have = {os.path.basename(f)[:-5] for f in glob.glob(f'results/results/olmo3-embed__{RUN}/*/*.json')}
         if task != CHECK: log(f'end {task}: ' + ('ok' if all(t in have for t in tasks) else f'MISSING {[t for t in tasks if t not in have]}'))
