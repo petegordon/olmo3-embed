@@ -589,7 +589,7 @@ Touche2020) are ~30M documents.
   started at 03:06 and 04:08, as D and E freed their slots). `merge_shards.py` on the Mac (2 min): **MSMARCO 38.57**
   (dev). D's SciFact/NFCorpus re-check ran but wasn't pushed: the log loop read `model_meta.json` (no scores) and its
   KeyError ended the cell (fixed). Rerun on a G4 (~10 min): **SciFact 79.43, NFCorpus 38.94** vs 79.47 / 38.98 with
-  fixed batching, so token-budget batching doesn't move scores. Phase 8 total ~475 units (890 → ~415).
+  fixed batching, so token-budget batching doesn't move scores. Phase 8 total ~468 units (890 → 422).
 
 **Run #4 BEIR-15 = 54.72** (estimate was ~54.2): **rank 37 of 140** 15-task models in the 2026-10-04 snapshot (between
 lightonai/GTE-ModernColBERT-v1 54.75 and manveertamber/cadet-embed-base-v1 54.32). T1 (56.6) missed by 1.88.
