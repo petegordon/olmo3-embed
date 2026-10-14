@@ -53,6 +53,9 @@ def main():
     ap.add_argument("--doc-cache", help="OlmoEmbedder: float16 document-embedding cache file on local disk, shared by "
                                         "the tasks of this process (FEVER + ClimateFEVER share a corpus)")
     ap.add_argument("--doc-cache-capacity", type=int, default=6_000_000, help="rows in --doc-cache")
+    ap.add_argument("--shard", help="I/N: search only the I-th of N corpus slices and save its top-k to --shard-out "
+                                     "(olmo3_embed.shards; merge with scripts/merge_shards.py)")
+    ap.add_argument("--shard-out", help="--shard: gzipped JSON of the shard's per-query top-k")
     ap.add_argument("--predictions", help="save per-query rankings here (mteb prediction_folder), e.g. for judged@10")
     args = ap.parse_args()
 
@@ -94,6 +97,11 @@ def main():
         from olmo3_embed.model import DocEmbeddingCache
 
         model.doc_cache = DocEmbeddingCache(args.doc_cache, model.model.config.hidden_size, args.doc_cache_capacity)
+    if args.shard:
+        from olmo3_embed.shards import ShardSearch
+
+        i, n = map(int, args.shard.split("/"))
+        model = ShardSearch(model, i, n, args.shard_out)
     mteb.evaluate(
         model,
         tasks,

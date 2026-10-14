@@ -11,7 +11,11 @@ The adapter comes from the GitHub release and results go to the `colab-results` 
 
 Jobs run on separate runtimes in parallel; set `JOB` (or upload `/root/.olmo3_JOB` from the Colab CLI). FEVER and
 ClimateFEVER share a 5.4M-passage corpus, so they run in one job with the document cache: the corpus is embedded once.
-The cell ends with `runtime.unassign()`, so the runtime stops itself even when no client is connected."""
+The cell ends with `runtime.unassign()`, so the runtime stops itself even when no client is connected.
+
+Colab ends a runtime at ~11.3 h, short of MSMARCO's ~11.5 h on a G4, so MSMARCO runs as corpus shards (`MSMARCO@i/N`,
+see `src/olmo3_embed/shards.py`): each saves its per-query top-1000 to the `msmarco-shards-<run>` release, and
+`scripts/merge_shards.py` scores the union with mteb, exactly as one full-corpus search would."""
 code = r'''import os, subprocess, time, glob, json
 JOB = open('/root/.olmo3_JOB').read().strip() if os.path.exists('/root/.olmo3_JOB') else 'A'  # browser: set A/B/C/D
 JOBS = __JOBS__
@@ -36,8 +40,24 @@ try:
               ' && bash /content/bootstrap.sh model-p7-run4-7b ' + RUN) == 0, 'bootstrap failed'
     os.chdir('/content/olmo3-embed')
     sh('git remote set-url origin https://x-access-token:$GH_TOKEN@github.com/petegordon/olmo3-embed.git')
+    SHARD_RELEASE = 'msmarco-shards-' + RUN
+    shards_ok = []
     CHECK = 'SciFact NFCorpus'  # token-budget batching re-check vs the Phase 7 scores (79.47 / 38.98), own folder
     for task in JOBS[JOB]:  # one process per task group so a failure in one doesn't lose the others
+        if '@' in task:  # 'MSMARCO@0/3': one corpus slice (olmo3_embed.shards); its top-k goes to the shards release
+            name, shard = task.split('@')
+            out = f'/content/{name}-{RUN}-shard{shard.replace("/", "of")}.json.gz'
+            log(f'start {task}')
+            sh(f'python -m olmo3_embed.eval --run runs/{RUN} --tasks {name} --max-seq-length 512 --batch-size 64 '
+               f'--token-budget {TOKEN_BUDGET} --shard {shard} --shard-out {out} 2>&1 | grep -vE "it/s]|Warning"')
+            ok = False
+            for attempt in range(6):
+                if os.path.exists(out) and sh(f'bash scripts/upload_release_asset.sh {SHARD_RELEASE} {out}') == 0:
+                    ok = True; break
+                time.sleep(30 + 30 * attempt)
+            log(f'end {task}: ' + ('ok' if ok else 'FAILED'))
+            shards_ok.append(ok)
+            continue
         tasks = task.split()
         cache = ' --doc-cache /content/doc_cache.npy' if task == 'FEVER ClimateFEVER' else ''
         if task == CHECK: cache = ' --name-suffix=-tbcheck'  # '=' or argparse reads -tbcheck as a flag
@@ -53,8 +73,8 @@ try:
             if sh(f'bash scripts/push_results.sh "Full BEIR run #4 {RUN}: {task} (job {JOB}, Colab)"') == 0: break
             time.sleep(30 + 30 * attempt)
     have = {os.path.basename(f)[:-5] for f in glob.glob(f'results/results/olmo3-embed__{RUN}/*/*.json')}
-    want = [t for g in JOBS[JOB] if g != CHECK for t in g.split()]
-    log(('BEIR15_JOB_DONE ' if all(t in have for t in want) else 'BEIR15_JOB_INCOMPLETE ') + JOB)
+    want = [t for g in JOBS[JOB] if g != CHECK and '@' not in g for t in g.split()]
+    log(('BEIR15_JOB_DONE ' if all(t in have for t in want) and all(shards_ok) else 'BEIR15_JOB_INCOMPLETE ') + JOB)
 finally:
     if not os.path.exists('/root/.olmo3_KEEP'):  # create this file to keep the runtime for debugging
         from google.colab import runtime
