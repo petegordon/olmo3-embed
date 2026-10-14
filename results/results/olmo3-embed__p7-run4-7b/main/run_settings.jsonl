@@ -1,2 +1,2 @@
-{"task": "HotpotQA", "splits": ["test"], "version": {"mteb": "2.24.12", "torch": "2.11.0+cu130", "sentence-transformers": "5.7.0", "flash-attn": null, "transformers": "5.18.0"}, "encode_kwargs": {"batch_size": 64}, "subsets": ["default"]}
-{"task": "Touche2020", "splits": ["test"], "version": {"mteb": "2.24.12", "torch": "2.11.0+cu130", "sentence-transformers": "5.7.0", "flash-attn": null, "transformers": "5.18.0"}, "encode_kwargs": {"batch_size": 64}, "subsets": ["default"]}
+{"task": "FEVER", "splits": ["test"], "version": {"mteb": "2.24.12", "torch": "2.11.0+cu130", "sentence-transformers": "5.7.0", "flash-attn": null, "transformers": "5.18.0"}, "encode_kwargs": {"batch_size": 64}, "subsets": ["default"]}
+{"task": "ClimateFEVER", "splits": ["test"], "version": {"mteb": "2.24.12", "torch": "2.11.0+cu130", "sentence-transformers": "5.7.0", "flash-attn": null, "transformers": "5.18.0"}, "encode_kwargs": {"batch_size": 64}, "subsets": ["default"]}
