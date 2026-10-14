@@ -574,6 +574,17 @@ Touche2020) are ~30M documents.
   A = MSMARCO + DBPedia (~17 h), B = FEVER + ClimateFEVER + NQ (~14 h), C = HotpotQA + Touche2020 (~7.5 h).
   Estimate ~340 units. The SciFact/NFCorpus re-check with the new batching failed to start (argparse read
   `-tbcheck` as a flag; fixed) and runs after the jobs.
+- **Results, day 1:** job C finished in 7.8 h: **HotpotQA 75.41**, **Touche2020 18.52**. Job B finished
+  FEVER + ClimateFEVER in 11.2 h (**FEVER 89.09**, **ClimateFEVER 37.00**; ClimateFEVER took 5 min thanks to the
+  cache) and pushed them at 21:59. Then **both A and B stopped at ~11.3 h** (~22:00, within minutes of each other, no
+  error pushed): A was still in MSMARCO, B had just started NQ. Two runtimes dying together at the same age points to a
+  Colab runtime-lifetime limit (~11–12 h), not to our code. ~267 units used (623 left).
+- **Relaunch (23:00):** D = NQ + the SciFact/NFCorpus re-check, E = DBPedia (each well under 11 h). MSMARCO needs
+  ~11.5 h on one G4, so it now runs as **3 corpus shards** (`MSMARCO@i/3`, `src/olmo3_embed/shards.py`). Each shard
+  searches a contiguous third of the corpus and uploads its per-query top-1000 to the release
+  `msmarco-shards-p7-run4-7b`. Then `scripts/merge_shards.py` scores the union with mteb, which equals a single
+  full-corpus search: on SciFact (MiniLM, 3 shards) all 149 metrics were identical. S0 started at once; S1 and S2
+  start when D and E free their slots (`queue_shards.sh` on the Mac).
 
 Also on Oct 11: PLAN.md status section (pre-public checklist, BEIR-15 blocker) and an Apache-2.0 LICENSE.
 

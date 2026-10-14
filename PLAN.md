@@ -177,7 +177,7 @@ ablation on the 1B proxy locally with NanoBEIR first. Truncating depth (§3) is 
   heldout-4 −0.34) and has no model-written training data, so no provider-terms question. Runs #1 and #2 aren't
   submittable: their training data overlaps the zero-shot test corpora (data card, "Applied retroactively").
 - **Compute:** personal account on Google AI Ultra (~890 units, 2026-10-13); cybercontext ~32.
-- **Full BEIR-15 for run #4 in progress** (Phase 8, launched 2026-10-13: 3 parallel G4 jobs, ~340 units, done ~Oct 14 morning).
+- **Full BEIR-15 for run #4 in progress** (Phase 8, launched 2026-10-13 on G4s). Done: HotpotQA, Touche2020, FEVER, ClimateFEVER (plus the 8 from Phase 7). Running: NQ, DBPedia, MSMARCO as 3 corpus shards (Colab ends runtimes at ~11.3 h). Expected Oct 14 late morning.
 - **Full BEIR-15 was the blocker for Ship:** ~250–350 A100 units (measured eval throughput; the §5 estimate was ~10× low).
   Plan: Pete's Colab upgrade on the personal account; first check whether 256-token documents (the training length) halve the
   cost without lowering scores, on 2 tasks.
