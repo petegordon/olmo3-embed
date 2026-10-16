@@ -617,6 +617,14 @@ splitting large corpora up front (or checkpointing embeddings) would have saved 
   `petegordon__olmo3-embed-7b/ad1008e…` (26 task files + model_meta.json); mteb's ResultCache loads it as 15 BEIR tasks,
   avg 54.72.
 
+- **PRs opened (Oct 15):** [mteb#5677](https://github.com/embeddings-benchmark/mteb/pull/5677) (ModelMeta) and
+  [results#775](https://github.com/embeddings-benchmark/results/pull/775) (BEIR-15), after both branches were rebased
+  on upstream main and re-checked: mteb ruff + model tests 3,731 passed; the results suite against the mteb branch
+  6,198 passed. Fixes from the review pass: the results are labelled BEIR, not MTEB(eng, v2) (a different 10-task
+  set); `contacts=["petegordon"]` added; the loader check is described as run on the export before upload, and the
+  "reference implementation" box is left unchecked with the reproduction numbers. results#775's
+  implementation check passes only once mteb#5677 is merged and released. Texts: `docs/ship-pr-drafts.md`.
+
 Also on Oct 11: PLAN.md status section (pre-public checklist, BEIR-15 blocker) and an Apache-2.0 LICENSE.
 
 **Learned:** headless Colab works end to end and needs no tab, but each runtime still costs one human consent click

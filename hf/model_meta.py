@@ -46,4 +46,5 @@ olmo3_embed_7b = ModelMeta(
     public_training_data="https://github.com/petegordon/olmo3-embed/blob/main/docs/data-card.md",
     training_datasets=training_datasets,
     adapted_from="allenai/Olmo-3-1025-7B",
+    contacts=["petegordon"],
 )
