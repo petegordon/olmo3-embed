@@ -624,6 +624,17 @@ splitting large corpora up front (or checkpointing embeddings) would have saved 
   set); `contacts=["petegordon"]` added; the loader check is described as run on the export before upload, and the
   "reference implementation" box is left unchecked with the reproduction numbers. results#775's
   implementation check passes only once mteb#5677 is merged and released. Texts: `docs/ship-pr-drafts.md`.
+- **Both merged (Oct 16).** mteb#5677 at 07:10 UTC, shipped in mteb **2.26.2** (11:32 UTC). On results#775 a
+  maintainer asked Pete to personally confirm the training-data checkbox (the PR said it was generated with Claude
+  Code); Pete confirmed, and it was merged at 14:03 UTC (`d49c00d`). The results repo's HF sync of that commit
+  succeeded. CI on #775 had failed only the two registry-lookup tests (model not yet in released mteb), as expected.
+  The "results obtained using the reference implementation" box stayed unchecked (Phase 8 used our training-time
+  encoder; the loader reproduces SciFact/NFCorpus). Leaderboard: look under **BEIR**, not MTEB(eng, v2); it may also
+  need the zero-shot filter relaxed (46%). Not yet seen there as of Oct 16.
+
+**Learned:** maintainers want the human author to own the attestation checkboxes, so the author should confirm them in
+their own words up front. Run upstream's own test suite against the companion PR's branch before opening; it predicts
+CI exactly.
 
 Also on Oct 11: PLAN.md status section (pre-public checklist, BEIR-15 blocker) and an Apache-2.0 LICENSE.
 

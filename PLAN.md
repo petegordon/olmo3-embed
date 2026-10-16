@@ -177,7 +177,8 @@ ablation on the 1B proxy locally with NanoBEIR first. Truncating depth (§3) is 
   heldout-4 −0.34) and has no model-written training data, so no provider-terms question. Runs #1 and #2 aren't
   submittable: their training data overlaps the zero-shot test corpora (data card, "Applied retroactively").
 - **Compute:** personal account on Google AI Ultra (~890 units, 2026-10-13); cybercontext ~32.
-- **Full BEIR-15 for run #4 done (2026-10-14): 54.72, rank 37 of 140** (2026-10-04 snapshot; T1 56.6 missed by 1.88). Phase 8 cost ~468 units. Next: Ship (HF model + model card, mteb ModelMeta PR, results PR).
+- **Full BEIR-15 for run #4 done (2026-10-14): 54.72, rank 37 of 140** (2026-10-04 snapshot; T1 56.6 missed by 1.88). Phase 8 cost ~468 units.
+- **Ship (2026-10-16):** HF model `petegordon/olmo3-embed-7b` @ `ad1008e`; mteb#5677 merged (in mteb 2.26.2); results#775 merged. Remaining: confirm it appears on the BEIR leaderboard; short write-up.
 - **Full BEIR-15 was the blocker for Ship:** ~250–350 A100 units (measured eval throughput; the §5 estimate was ~10× low).
   Plan: Pete's Colab upgrade on the personal account; first check whether 256-token documents (the training length) halve the
   cost without lowering scores, on 2 tasks.
