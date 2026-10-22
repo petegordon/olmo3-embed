@@ -1,0 +1,9 @@
+{
+  "model": "allenai/OLMo-2-0425-1B",
+  "run_name": "p2-a4-neg1",
+  "pooling": "mean",
+  "bidirectional": false,
+  "instructions": true,
+  "dtype": "bfloat16",
+  "steps": 125
+}

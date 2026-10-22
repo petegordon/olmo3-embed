@@ -1,0 +1,10 @@
+{
+  "model": "allenai/OLMo-2-0425-1B",
+  "run_name": "p5-v1",
+  "pooling": "last",
+  "bidirectional": false,
+  "instructions": false,
+  "instruction_mode": "per_task",
+  "dtype": "bfloat16",
+  "steps": 496
+}
